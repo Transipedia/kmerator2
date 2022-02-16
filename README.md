@@ -35,7 +35,8 @@ optional arguments:
                         list of gene IDs or transcript IDs (ENSG, ENST or gene Symbol) to  
                         select inside your fasta transcriptome file and that you want to  
                         extract specific kmers from. If
-                        you want to use your own sequences, you can give your fasta file with --fasta_file option.
+                        you want to use your own sequences, you can give your fasta file   
+                        with --fasta_file option.
   -f FASTA_FILE, --fasta-file FASTA_FILE
                         sequences in fasta format (genes or transcripts) that you want to  
                         extract specific kmers from. If you don't have your own sequences  
@@ -67,8 +68,8 @@ optional arguments:
   						annotations.
   -k KMER_LENGTH, --kmer-length KMER_LENGTH
                         k-mer length that you want to use (default 31).
-  --stringent           FOR GENE LEVEL ONLY: use this option if you want to select   
-  					   gene-specific k-mers present in ALL known transcripts for your gene.   
+  --stringent           FOR GENE LEVEL ONLY: use this option if you want to select
+                        gene-specific k-mers present in ALL known transcripts for your gene.   
   					   If false, a k-mer is considered as gene-specific if present in at   
   					   least one isoform of your gene of interest.
   --threshold THRESHOLD

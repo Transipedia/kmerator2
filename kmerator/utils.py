@@ -4,6 +4,7 @@
 Options and arguments to bo passed on to the program.
 """
 
+import os
 import sys
 import argparse
 import info
@@ -144,7 +145,7 @@ def checkup_args(args):
     ### Check transcriptome fasta file extension
     if args.transcriptome.name.split('.')[-1] not in ("fa", "fasta"):
         sys.exit(f" {Color.RED}Error: {os.path.basename(args.transcriptome.name)}" \
-                f"Does not appears to be a fasta file.{Color.END}")
+                f" does not appears to be a fasta file.{Color.END}")
     ### Check Gene Select option
     if args.selection:
         for gene in args.selection:
@@ -168,7 +169,7 @@ def is_transcriptome_ensembl_file(first_row):
     """Checks if the line matches the Ensembl transcriptome file format"""
     line = first_row.split()
     try:
-        if (not line[6].startswith('gene_symbol:') or 
+        if (not line[6].startswith('gene_symbol:') or
             not line[0].startswith('>ENST') or
             not line[3].startswith('gene:')):
             return False
