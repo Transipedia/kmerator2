@@ -8,7 +8,9 @@ From genes, transcripts or sequences, find specific kmers.
 import sys
 import os
 import subprocess
+import requests
 
+import info
 from utils import usage, checkup_args, Color
 
 
@@ -22,11 +24,24 @@ def main():
     ### build jellyfis genome and transcriptome
     jf_genome, jf_dir = run_jellyfish(args)
 
-    print(f"{Color.CYAN}\n  🪚  WORK IN PROGRESS. 🛠 curent step : define 'get_canonical_transcript()' function.{Color.END}\n")
+    ### get Ensembl name ID
+    ensg_id = get_ensembl_id('RUNX1')
 
-    ### fetch canonical transcript
-    # APPRIS_function in julia version
-    get_canonical_transcript(args, 'ENSG00000099899')
+    ### get canonical transcript
+    canonical_transcript = get_canonical_transcript(ensg_id)
+    print(canonical_transcript)
+
+    print(f"{Color.CYAN}\n     🪚  WORK IN PROGRESS. 🛠 next step : define 'find_longest_variant()' function.{Color.END}\n")
+
+    print(f'''{Color.CYAN}
+    Nota :
+    - le dictionnaire renvoie t'il les mêmes positions que l'API d'ensembl ? (regarder avec gene_info.py)
+    - Si oui, et en tenant compte du code complet, peut-être que le dictionnaire des transcripts ne sera pas utile...
+
+    Sinon :
+    - faire un git spécifique pour gene-info.py
+    ''')
+
 
 
 def load_transcriptome(args):
@@ -126,87 +141,24 @@ def run_jellyfish(args):
     return jf_genome, jf_dir
 
 
-### APPRIS_function() in julia version
-def get_canonical_transcript(args, ref_gene):
-    url = f"http://apprisws.bioinfo.cnio.es/rest/exporter/id/{args.appris}/{ref_gene}?methods=appris&format=json&sc=ensembl"
-    print(url)
-    pass
 
-''' --> JULIA VERSION
-function APPRIS_function(gene_ref)
-    ! verbose_option ? print("\r") : println("\r ------------")
-    print("Finding the principal isoform based on APPRIS database for $gene_ref... \n")
-    ## Request to appris
-    url = "http://apprisws.bioinfo.cnio.es/rest/exporter/id/$APPRIS_option/" *
-            "$gene_ref?methods=appris&format=json&sc=ensembl"
-    if verbose_option println("\nAPPRIS url: $url") end
-    ## make_API_call(url)
+def get_ensembl_id(ref_gene):
+    server = "https://rest.ensembl.org"
+    ext = "/xrefs/symbol/homo_sapiens/"
+    r = requests.get(server+ext+ref_gene+"?", headers={ "Content-Type" : "application/json"})
+    if not r.ok:
+        print(r.raise_for_status())
+    if not r.json(): return None
+    return [item['id'] for item in r.json() if item['id'].startswith('ENSG')][0]
 
-    function http_req(url)
-        try
-            r = HTTP.request("GET", url; verbose=0)
-            res = String(r.body)
-            res = JSON.Parser.parse(res)
-            return res
-        catch err
-            if verbose_option println("ERROR:\n $err") end
-            res = "NODATA"
-            return res
-        end
-    end
 
-    transcripts = http_req(url)
-    if verbose_option && isa(transcripts, Array)
-        for transcript in transcripts
-            println("First transcript found:")
-            for (key,value) in transcript
-                println("  $key: $value")
-            end
-            break
-        end
-    end
-    ## Finding the best isoform, find Principals
-    principals = []
-    for (i,value) in enumerate(transcripts)
-        try
-            if occursin("PRINCIPAL:", transcripts[i]["reliability"])
-                push!(principals, transcripts[i]["reliability"])
-            end
-        catch
-        end
-    end
-    ## if no principals, return NODATA
-    if isempty(principals)
-        if verbose_option
-            println("No principal isoform detected, this function will return " *
-                        "'NODATA' and the longest transcript will be selected")
-        end
-        return(transcripts)
-    end
-    if verbose_option println("principals: $principals \n") end
-    ## Select best Principal (minimum level)
-    levels = []
-    for i in 1:length(principals)
-        push!(levels, split(principals[i],":")[2])
-    end
-    levels = map(x-> parse(Int, x), levels)
-    level = minimum(levels)
-    ## if multiple transcripts with better Principal, select the biggest
-    selected_transcripts = hcat(map(x -> try x["transcript_id"]
-                                         catch end, transcripts),
-                                map(x -> try parse(Int, x["length_na"])
-                                         catch end, transcripts),
-                                map(x -> try x["reliability"]
-                                         catch end, transcripts))
-    selected_transcripts = selected_transcripts[map(x -> x != nothing, selected_transcripts[:, 3]), :]
-    selected_transcripts = selected_transcripts[map(x -> occursin("PRINCIPAL:$level",x), selected_transcripts[:, 3]), :]
-    max_length = maximum(selected_transcripts[:,2])
-    selected_transcripts = selected_transcripts[map(x -> x == max_length, selected_transcripts[:, 2]), :]
-    best_transcript = String( unique(selected_transcripts[:,1])[1])
-    if verbose_option println("APPRIS result : $best_transcript \nAPPRIS function finished \n\r ------------ \n\n") end
-    return(best_transcript)
-end # end of APPRIS function
-'''
+def get_canonical_transcript(ensg_id):          ### APPRIS_function() in julia version
+    server = "https://rest.ensembl.org"
+    ext = "/lookup/id/"
+    r = requests.get(server+ext+ensg_id+"?", headers={ "Content-Type" : "application/json"})
+    if not r.ok:
+        return None
+    return r.json()['canonical_transcript'].split('.')[0]
 
 
 if __name__ == '__main__':
