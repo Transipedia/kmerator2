@@ -11,4 +11,5 @@ kmerexplor-results/
 
 # misc
 *.backup
-output
+output*/
+dev-*/

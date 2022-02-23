@@ -62,16 +62,12 @@ def usage():
                             ),
                         required=True,
                         )
-    parser.add_argument('-a', '--appris',
+    parser.add_argument('-c', '--canonical',  ### replace -a --appris in julia version
                         help=(
-                            "indicate: 'homo_sapiens', 'mus_musculus', 'rattus_norvegicus', "
-                            "'danio_rerio', 'sus_scrofa', or virtually any specie available in "
-                            "APPRIS database [Rodriguez JM, et al. Nucleic Acids Res. Database "
-                            "issue; 2017 Oct 23]. Genes have multiple possible transcripts called "
-                            "isoforms. This option selects the principal transcript defined in "
-                            "APPRIS database. If this option is used and there is no data "
-                            "available, no connection or no principal transcript (non-coding genes)"
-                            ", the longer transcript is selected."
+                            "indicate a specie referenced in Ensembl, to help, show the link "
+                            "https://rest.ensembl.org/documentation/info/species. You can use "
+                            "the 'name', the 'display_name' or any 'aliases'. For example human, "
+                            "homo_sapiens or homsap are valid."
                             ),
                         )
     parser.add_argument('-u', '--unannotated',
@@ -107,9 +103,9 @@ def usage():
                         help="output directory (default: 'output')",
                         default='output',
                         )
-    parser.add_argument('-c', '--cores',
+    parser.add_argument('-p', '--procs',
                         type=int,
-                        help="run n cores simultaneously (default: 1)",
+                        help="run n processes simultaneously (default: 1)",
                         default=1,
                         )
     parser.add_argument('--verbose',
@@ -157,9 +153,9 @@ def checkup_args(args):
     if not is_transcriptome_ensembl_file(args.transcriptome.readline()):
         sys.exit(f"{Color.RED}Error: {os.path.basename(args.transcriptome.name)} not in ENSEMBL fasta format, "
                 f"use ENSEMBL transcriptome fasta file.{Color.END}")
-    ## APPRIS option works only with the gene annotated level
-    if args.appris and args.level != "gene":
-        sys.exit(f"{Color.RED}Error: APPRIS option requires --level option as 'gene'{Color.END}")
+    ## CANONICAL option works only with the gene annotated level
+    if args.canonical and (args.level != "gene" or args.unannotated):
+        sys.exit(f"{Color.RED}Error: CANONICAL option works only with the gene annotated level{Color.END}")
     ## chimera level works only with unannotated option
     if not args.unannotated and args.level == 'chimera':
         sys.exit(f"{Color.RED}Error: chimera level needs unannotated option{Color.END}")
@@ -189,4 +185,3 @@ class Color:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
     END = '\033[0m'
-
