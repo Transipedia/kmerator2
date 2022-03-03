@@ -159,6 +159,9 @@ def checkup_args(args):
     ## chimera level works only with unannotated option
     if not args.unannotated and args.level == 'chimera':
         sys.exit(f"{Color.RED}Error: chimera level needs unannotated option{Color.END}")
+    ### unanotated option want fasta_file option
+    if args.unannotated and not args.fasta_file:
+        sys.exit(f"{Color.RED}Error: with unannotated option, 'fasta-file' option is required.{Color.END}")
 
 
 def is_transcriptome_ensembl_file(first_row):

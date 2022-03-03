@@ -3,7 +3,7 @@
 
 import requests, sys
 
-server = "https://rest.ensembl.org"
+server = "https://rest.ensemb.org"
 ext = "/lookup/id/"
 genes = (
     'ENSG00000157764',
@@ -14,8 +14,11 @@ genes = (
 )
 
 for gene in genes:
-    r = requests.get(server+ext+gene+"?", headers={ "Content-Type" : "application/json"})
-
+    try:
+        r = requests.get(server+ext+gene+"?", headers={ "Content-Type" : "application/json"})
+    except requests.exceptions.ConnectionError:
+        print(f"Warning: {server!r} not responding")
+        continue
     if not r.ok:
         r.raise_for_status()
         sys.exit()

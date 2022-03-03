@@ -20,13 +20,12 @@ def main():
     if args.verbose: print(f"{'-'*9}\n{Color.YELLOW}Args:\n{args}{Color.END}")
     checkup_args(args)
     ### load transcriptome as dict
-    # ~ transcriptome_dict = load_transcriptome(args)
     if args.unannotated:
-        transcriptome_dict = fasta_as_dict(args, args.transcriptome.name)
+        transcriptome_dict = fasta_as_dict(args, args.fasta_file)
     else:
         transcriptome_dict = ensembl_fasta_as_dict(args, args.transcriptome.name)
-    ### build jellyfis genome and transcriptome
-    jf_genome, jf_dir = run_jellyfish(args)
+    ### build jellyfish genome and transcriptome
+    jf_genome, jf_dir = _run_jellyfish(args)
 
     ''' For testing (TO DELETE)
     ### get Ensembl name ID
@@ -46,8 +45,7 @@ def main():
     print(f"{Color.CYAN}\n     🪚  WORK IN PROGRESS. 🛠 current step : define 'build sequences()'{Color.END}")
 
     print(f'''{Color.CYAN}
-     Sinon :
-    - faire un git spécifique pour gene-info.py
+     Sinon : faire un git spécifique pour gene-info.py
     ''')
 
 
@@ -88,7 +86,7 @@ def fasta_as_dict(args, fastafile):
     It keeps all the header
     '''
     fasta_dict = {}
-    with open(fastafile) as fh:
+    with open(fastafile.name) as fh:
         seq = ""
         old_desc, new_desc = "", ""
         for line in fh:
@@ -104,53 +102,7 @@ def fasta_as_dict(args, fastafile):
     return fasta_dict
 
 
-def load_transcriptome(args):
-    """
-    Load transcriptome file as dict
-    if --unannotated is set -> basic conversion
-    else description is modified
-    """
-    if args.verbose: print(f"{'-'*9}\n{Color.YELLOW}"
-                    f"Creating a dictionary of transcriptome file{Color.END}.")
-    transcriptome = {}
-    with open(args.transcriptome.name) as fh:
-        seq = ""
-        old_desc, new_desc = "", ""
-        if args.unannotated:
-            ### basic convertion to dict
-            for line in fh:
-                if line[0] == ">":
-                    new_desc = line.rstrip().lstrip('>')
-                    if old_desc:
-                        transcriptome[old_desc] = seq
-                        seq = ""
-                    old_desc = new_desc
-                else:
-                    seq += line.rstrip()
-            transcriptome[old_desc] = seq
-        else:
-            ### convert fasta to dict with renamed description
-            for line in fh:
-                if line[0] == ">":
-                    new_desc = line.split()
-                    gene_name = new_desc[6].split(':')[1]
-                    ensembl_transcript_name = new_desc[0].split('.')[0].lstrip('>')
-                    ensembl_gene_name = new_desc[3].split(':')[1].split('.')[0]
-                    # ensembl_gene_name = new_desc[3].split(':')[1].split('.')[0]
-                    new_desc = f"{gene_name}:{ensembl_transcript_name}:{ensembl_gene_name}"
-                    if old_desc:
-                        transcriptome[old_desc] = seq
-                        seq = ""
-                    old_desc = new_desc
-                else:
-                    seq += line.rstrip()
-            transcriptome[old_desc] = seq
-        if args.verbose: print(f"{Color.YELLOW}Transcript dictionary is done.{Color.END}")
-
-    return transcriptome
-
-
-def run_jellyfish(args):
+def _run_jellyfish(args):
     genome = args.genome.name
     ### create jellyfish PATH DIR
     jf_dir = f"{args.output}/jellyfish_indexes/{args.kmer_length}"
@@ -202,7 +154,7 @@ def run_jellyfish(args):
     return jf_genome, jf_dir
 
 
-def get_ensembl_id(args, ref_gene):
+def _get_ensembl_id(args, ref_gene):
     server = "https://rest.ensembl.org"
     ext = f"/xrefs/symbol/{args.canonical}/"
     r = requests.get(server+ext+ref_gene+"?", headers={ "Content-Type" : "application/json"})
@@ -211,21 +163,21 @@ def get_ensembl_id(args, ref_gene):
     return [item['id'] for item in r.json() if item['id'].startswith('ENS')][0]
 
 
-def get_canonical_transcript(ens_id):          ### APPRIS_function() in julia version
-    server = "https://rest.ensembl.org"
+def _get_canonical_transcript(ens_id):          ### APPRIS_function() in julia version
+    server = "https://rest.ensembL.org"
     ext = "/lookup/id/"
-    r = requests.get(server+ext+ens_id+"?", headers={ "Content-Type" : "application/json"})
+    try:
+        r = requests.get(server+ext+ens_id+"?", headers={ "Content-Type" : "application/json"})
+    except requests.exceptions.ConnectionError:
+        print(f"Warning: {server!r} not responding")
+        return None
     if not r.ok: return None
     if not r.json(): return None
     return r.json()['canonical_transcript'].split('.')[0]
 
 
-def find_longest_variant(args, gene_name, transcriptome_dict):
+def _find_longest_variant(args, gene_name, transcriptome_dict):
     if args.verbose: print(f"{'-'*9}\n{Color.YELLOW}Finding the longest variant for the gene {gene_name}.{Color.END}")
-    gene_name = gene_name.replace("/", "@SLASH@")           # sometimes, gene name contains a '/'
-    # ~ for k,v in transcriptome_dict.items():
-        # ~ print(k,v)
-        # ~ sys.exit()
     variants_dict = { k:len(v) for (k,v) in transcriptome_dict.items() if k.startswith(f"{gene_name}:")}
     # ~ print(*[k for k in variants_dict], sep='\n')
     nb_variants = len(variants_dict)
@@ -235,12 +187,37 @@ def find_longest_variant(args, gene_name, transcriptome_dict):
     for k,v in variants_dict.items():
         if v > length:
             length = v
-            longest_variant = ':'.join(k.split(':')[:2])
-    print(f"{longest_variant = }")
+            longest_variant = ':'.join(k.split(':')[1:2])
+    # ~ print(f"{longest_variant = }")
     return longest_variant
 
 
+def _store_fasta_seq(args, gene_name, ensembl_transcript_name, seq):
+    '''Print fasta sequence'''
+    gene_name = gene_name.replace('/', '@SLASH@')
+    outfile = os.path.join(args.output, 'sequences', f'{gene_name}.{ensembl_transcript_name}.fa')
+    with open(outfile, 'w') as fh:
+        fh.write(f">{gene_name}:{ensembl_transcript_name}\n{seq}")
+
+
 def build_sequences(args, transcriptome_dict):
+    '''
+    build fasta files with sequences of genes/transcripts
+    when --fasta-file args is set --> sequences are fetch from the fasta-file arg
+    when --selection args is set  --> sequences are fetch from the transcriptome arg
+    case 1: unanotated is not set
+        subcase 1: level is transcript (--selection must be set)
+            get sequences -from transcriptome)
+        subcase 2: level is gene
+            sub2case 1: level is TRANSCRIPT
+            sub2case 2: level is GENE
+                --fasta-file is set OR gene and transcript in --selection
+                sub3case 1: canonical is set
+                    get canonical transcript
+                sub3case 2: canonical is not set
+    case 2: unanotated is set
+
+    '''
     ### Creating individual sequence files from input fasta file or genes/transcripts list
     if args.fasta_file:
         fastafile = ensembl_fasta_as_dict(args, args.fasta_file.name)
@@ -249,64 +226,88 @@ def build_sequences(args, transcriptome_dict):
         fastafile = transcriptome_dict
         if args.verbose:  print(f"{Color.YELLOW}{'-'*12}\n\nCreating sequences from transcripts/genes list.\n{Color.END}")
     ### create output directory structure
-    os.makedirs(os.path.join(args.output, 'sequences'), exist_ok=True)
+    output_seq_dir = os.path.join(args.output, 'sequences')
+    os.makedirs(output_seq_dir, exist_ok=True)
 
-    ### if 'unanotated' option is set
+    ### when 'unanotated' option is set
     if args.unannotated:
         ### without ensembl annotations
-        pass
-    ### if 'unanotated' option is not set
+        for desc,seq in fastafile.items():
+            outfile = f"{desc.replace(' ', '_').replace('/', '@SLASH@')}.fa"[:255]
+            if os.path.isfile(os.join(output_seq_dir, outfile)):
+                print(f"{Color.PURPLE}Warning: file {outfile!r} already exist => ignored")
+            if len(seq) >= args.kmer_length:
+                with open(os.path.join(output_seq_dir, outfile), 'w') as fh:
+                    fh.write(f">{desc[:79]}\n{seq}")
+            else:
+                print(f"{Color.PURPLE}Warning: {gene_name!r} sequence length < {args.kmer_length} => ignored")
+
+
+
+    ### when 'unanotated' option is not set
     else:
         ### with ensembl annotations
-        '''
-        As alternative, use ENSEMBL API to get ensembl-gene-name and ensemb-canonical-name ???
-        '''
-        genes_already_processed = []
-        genes_analysed = []
+        genes_already_processed = set()
+        genes_analysed = set()
 
-    for desc,seq in fastafile.items():
+        ### Remember fastafile could be '--fasta_file' option or 'transcriptome'
+        for desc,seq in fastafile.items():
             gene_name, ensembl_transcript_name, ensembl_gene_name = desc.split(':')
 
             ### Transcript level
             if args.level == "transcript":
-                ## transcript not in selection list
+                ## transcript is in selection list
                 if args.selection and ensembl_transcript_name in args.selection:
                     if len(seq) < args.kmer_length:
-                        print(f"{ensembl_transcript_name}: sequence length < {arg.kmer_length} => ignored")
+                        print(f"{Color.CYAN}{ensembl_transcript_name}: sequence length < {arg.kmer_length} => ignored{Color.END}")
                         continue
-                    print("================")
-                    print(f"{ensembl_transcript_name} est dans la selection")
-                    print(f"GENE NAME: {gene_name}")
-                    print(f"ENSEMB TRANSCRIPT NAME: {ensembl_transcript_name}")
-                    print(f"ENSEMB GENE NAME: {ensembl_gene_name}")
-                    print(f"SEQ LENGTH: {len(seq)}")
                     gene_name = gene_name.replace('/', '@SLASH@')
-                    outfile = os.path.join(args.output, 'sequences', f'{gene_name}.{ensembl_transcript_name}.fa')
+                    outfile = os.path.join(output_seq_dir, f'{gene_name}.{ensembl_transcript_name}.fa')
                     with open(outfile, 'w') as fh:
                         fh.write(f">{gene_name}:{ensembl_transcript_name}\n{seq}")
-
                 else:
-                    # ~ print(f"{ensembl_transcript_name} n'est pas dans la selection")
                     continue
 
-            ### Transcript level
-            else:
-                pass
-            '''
-            ## Transcript level
-            if level == "transcript"
-                if !isempty(select_option) && !(ensembl_transcript_name in select_option)
-                   continue
-                else
-                    if length("$seq") >= kmer_length
-                        if verbose_option println("$ensembl_transcript_name: sequence length >= $kmer_length => continue") end
-                        gene_name = replace(gene_name, "/" => "@SLASH@") # some gene names can contain slash characters that break the processus
-                        FastaWriter("$output/sequences/$gene_name:$ensembl_transcript_name.fa") do fwsequence
-                            write(fwsequence, [">$gene_name:$ensembl_transcript_name", "$seq"])
-                        end
-                    else println("$ensembl_transcript_name: sequence length < $kmer_length => ignored") end
-                end
-            '''
+            ### gene level
+            elif args.level == "gene":
+                ### testing if gene has not been already processed
+                ### if --fasta-file OR gene and transcript in --selection AND gene not in genes_already_processed
+                if args.fasta_file or (gene_name in args.selection or ensembl_gene_name in args.selection) and gene_name not in genes_already_processed:
+                ### --canonical option is set
+                    if not gene_name in genes_analysed:
+                        ### --canonical option is set
+                        if args.canonical:
+                            canonical_transcript = _get_canonical_transcript(ensembl_gene_name)
+                            if canonical_transcript:
+                                print(f"{'-'*12}\nUSE CANONICAL TANSCRIPT") # TO DELETE
+                                print(f" GENE NAME: {gene_name}") # TO DELETE
+                                print(f" DESC: {desc.split(':')[:2]}") # TO DELETE
+                                print(f" CANONICAL TRANSCRIPT: {canonical_transcript}") # TO DELETE
+                                print(f" ENSEMBL TRANSCRIPT NAME: {ensembl_transcript_name}") # TO DELETE
+                                _store_fasta_seq(args, gene_name, canonical_transcript, seq)
+                                genes_analysed.add(gene_name)
+                                continue
+                            else:
+                                print(f"{Color.PURPLE}Warning: something went wrong with the Ensembl API for {gene_name!r}, using longest transcript.{Color.END}")
+                        ### without canonical option, use longest transcript
+                        longest_transcript = _find_longest_variant(args, gene_name, transcriptome_dict)
+                        print(f"{'-'*12}\nUSE LONGEST TRANSCRIPT") # TO DELETE
+                        print(f" GENE NAME: {gene_name}") # TO DELETE
+                        print(f" LONGEST TRANSCRIPT: {longest_transcript}") # TO DELETE
+                        if len(seq) >= args.kmer_length:
+                            ### write results
+                            _store_fasta_seq(args, gene_name, longest_transcript, seq)
+                            genes_analysed.add(gene_name)
+                        else:
+                            print(f"{Color.PURPLE}Warning: {gene_name!r} sequence length < {args.kmer_length} => ignored")
+
+
+
+
+
+
+
+
 
 
 if __name__ == '__main__':

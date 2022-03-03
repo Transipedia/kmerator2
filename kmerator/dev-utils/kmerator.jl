@@ -426,7 +426,7 @@ function find_longest_variant(gene_name, transcriptome_dict)
     ## sometimes, gene name contains a slash!
     gene_name = replace(gene_name, "/" => "@SLASH@")
     if verbose_option println("$gene_name : longest variant = $longest_variant \nFinding the longest variant done\n \r ------------ \n") end
-    println("LONGEST VARIANT: $longest_variant")     ### TO DELETE
+    #~     println("LONGEST VARIANT: $longest_variant")     ### TO DELETE
     return(longest_variant)
 end
 
@@ -456,12 +456,6 @@ function build_sequences() ## Creating individual sequence files from input fast
                     if !isempty(select_option) && !(ensembl_transcript_name in select_option)
                        continue
                     else
-                        println("GENE NAME: $gene_name")                                   ####### TO DELETE
-                        println("ENSEMBL TRANSCRIPT NAME: $ensembl_transcript_name")       ####### TO DELETE
-                        println("ENSEMBL GENE NAME: $ensembl_gene_name")                   ####### TO DELETE
-                        len = length("$seq")                                               ####### TO DELETE
-                        println("SEQ LENGTH: $len")                                        ####### TO DELETE
-
                         if length("$seq") >= kmer_length
                             if verbose_option println("$ensembl_transcript_name: sequence length >= $kmer_length => continue") end
                             gene_name = replace(gene_name, "/" => "@SLASH@") # some gene names can contain slash characters that break the processus
@@ -472,22 +466,26 @@ function build_sequences() ## Creating individual sequence files from input fast
                     end
                 end
 
-####################################################################################################
-###                                     PYKMERATOR STEP                                          ###
-####################################################################################################
-
-
                 ## Gene level
                 if level == "gene"
                     ## testing if gene has not been already processed
                     if isempty(select_option) || (gene_name in select_option || ensembl_gene_name in select_option) && !(gene_name in genes_already_processed) ## keeping all sequences corresponding to genes into select_option or take them all if select_option == false
                         if APPRIS_option != nothing && !(gene_name in genes_analysed)
                             APPRIS_transcript = APPRIS_function(ensembl_gene_name)
+                            println("USE APPRIS PRINCIPAL TRANSCRIPT")
+                            println(" GENE NAME: $gene_name")
+                            println(" ENSEMBL TRANSCRIPT NAME: $ensembl_transcript_name")
+                            println(" APPRIS TRANSCRIPT: $APPRIS_transcript")
                             push!(genes_analysed, gene_name)
-			    # println("APPRIS selected variant : $APPRIS_transcript")
+                            # println("APPRIS selected variant : $APPRIS_transcript")
                             # écrire dans un fichier ?
                         end
                         if APPRIS_option == nothing || (ensembl_transcript_name == APPRIS_transcript) || (APPRIS_transcript == "NODATA" && "$gene_name:$ensembl_transcript_name" == find_longest_variant(gene_name,transcriptome_dict))
+                            println("------------")
+                            println("USE LONGEST TRANSCRIPT")
+                            println(" GENE NAME: $gene_name")
+                            println(" ENSEMBL TRANSCRIPT NAME: $ensembl_transcript_name")
+                            println(" APPRIS TRANSCRIPT: $APPRIS_transcript")
                             if verbose_option println("ensembl_transcript_name : $ensembl_transcript_name") end
                             if length("$seq") >= kmer_length
                                 if verbose_option println("$gene_name:$ensembl_transcript_name: sequence length >= $kmer_length => continue") end
@@ -503,7 +501,6 @@ function build_sequences() ## Creating individual sequence files from input fast
                     end
                 end
             end
-            exit()                                                                 ####### TO DELETE
 
             for i in unique(genes_analysed)
                 ## it can happen that APPRIS contains obsolete IDs/error => longer variant selected for the concerned gene
@@ -521,6 +518,12 @@ function build_sequences() ## Creating individual sequence files from input fast
                 end
             end
         end
+
+
+####################################################################################################
+###                                     PYKMERATOR STEP                                          ###
+####################################################################################################
+
 
     else  ## unannotated option
         FastaReader(fastafile) do fr
@@ -547,7 +550,12 @@ function build_sequences() ## Creating individual sequence files from input fast
         end
     end
     if verbose_option println("\nSequences splitting into individual files done \n \r ------------ \n") end
+
+            exit()                                                                 ####### TO DELETE
+
 end
+
+
 
 
 ## MAIN
