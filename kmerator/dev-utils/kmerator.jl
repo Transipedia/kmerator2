@@ -310,15 +310,15 @@ end
 
 
 function run_jellyfish(genome, transcriptome_fa)
-#~     jf_dir = "$output/jellyfish_indexes/$kmer_length"
-#~     ## run jellyfish on transcriptome
-#~     ! verbose_option ? print("\r") : println("\r ------------ \n")
-#~     print("Running jellyfish on the transcriptome... ")
-#~     jf_transcriptome = replace(basename(transcriptome_fa), ".fa" => ".jf")
-#~     run(`mkdir -p $jf_dir`)
-#~     global transcriptome = "$jf_dir/$(replace(basename(transcriptome_fa), ".fa" => ".jf"))"
-#~     run(`jellyfish count -m $kmer_length -s 10000 -t $nbthreads -o $jf_dir/$jf_transcriptome $transcriptome_fa`)
-#~     if verbose_option println("\nTranscriptome kmer index output: $jf_dir/$jf_transcriptome") end
+    jf_dir = "$output/jellyfish_indexes/$kmer_length"
+    ## run jellyfish on transcriptome
+    ! verbose_option ? print("\r") : println("\r ------------ \n")
+    print("Running jellyfish on the transcriptome... ")
+    jf_transcriptome = replace(basename(transcriptome_fa), ".fa" => ".jf")
+    run(`mkdir -p $jf_dir`)
+    global transcriptome = "$jf_dir/$(replace(basename(transcriptome_fa), ".fa" => ".jf"))"
+    run(`jellyfish count -m $kmer_length -s 10000 -t $nbthreads -o $jf_dir/$jf_transcriptome $transcriptome_fa`)
+    if verbose_option println("\nTranscriptome kmer index output: $jf_dir/$jf_transcriptome") end
 
     ## run jellyfish on genome if genome is fasta file
     if occursin(r".*\.(fa|fasta)$", genome)
@@ -407,7 +407,6 @@ function APPRIS_function(gene_ref)
     selected_transcripts = selected_transcripts[map(x -> x == max_length, selected_transcripts[:, 2]), :]
     best_transcript = String( unique(selected_transcripts[:,1])[1])
     if verbose_option println("APPRIS result : $best_transcript \nAPPRIS function finished \n\r ------------ \n\n") end
-    println("BEST APPRIS TRANSCRIPT: $best_transcript")  ### TO DELETE
     return(best_transcript)
 end # end of APPRIS function
 
@@ -472,20 +471,11 @@ function build_sequences() ## Creating individual sequence files from input fast
                     if isempty(select_option) || (gene_name in select_option || ensembl_gene_name in select_option) && !(gene_name in genes_already_processed) ## keeping all sequences corresponding to genes into select_option or take them all if select_option == false
                         if APPRIS_option != nothing && !(gene_name in genes_analysed)
                             APPRIS_transcript = APPRIS_function(ensembl_gene_name)
-                            println("USE APPRIS PRINCIPAL TRANSCRIPT")
-                            println(" GENE NAME: $gene_name")
-                            println(" ENSEMBL TRANSCRIPT NAME: $ensembl_transcript_name")
-                            println(" APPRIS TRANSCRIPT: $APPRIS_transcript")
                             push!(genes_analysed, gene_name)
                             # println("APPRIS selected variant : $APPRIS_transcript")
                             # écrire dans un fichier ?
                         end
                         if APPRIS_option == nothing || (ensembl_transcript_name == APPRIS_transcript) || (APPRIS_transcript == "NODATA" && "$gene_name:$ensembl_transcript_name" == find_longest_variant(gene_name,transcriptome_dict))
-                            println("------------")
-                            println("USE LONGEST TRANSCRIPT")
-                            println(" GENE NAME: $gene_name")
-                            println(" ENSEMBL TRANSCRIPT NAME: $ensembl_transcript_name")
-                            println(" APPRIS TRANSCRIPT: $APPRIS_transcript")
                             if verbose_option println("ensembl_transcript_name : $ensembl_transcript_name") end
                             if length("$seq") >= kmer_length
                                 if verbose_option println("$gene_name:$ensembl_transcript_name: sequence length >= $kmer_length => continue") end
@@ -519,12 +509,6 @@ function build_sequences() ## Creating individual sequence files from input fast
             end
         end
 
-
-####################################################################################################
-###                                     PYKMERATOR STEP                                          ###
-####################################################################################################
-
-
     else  ## unannotated option
         FastaReader(fastafile) do fr
             for (desc, seq) in fr
@@ -550,9 +534,6 @@ function build_sequences() ## Creating individual sequence files from input fast
         end
     end
     if verbose_option println("\nSequences splitting into individual files done \n \r ------------ \n") end
-
-            exit()                                                                 ####### TO DELETE
-
 end
 
 
@@ -585,6 +566,8 @@ build_sequences() 						# create 1 file by requested sequence
 @passobj 1 workers() admission_threshold
 
 
+
+
 ## Extraction of specific kmers for one splitted fasta file (one sequence)
 @everywhere function f(splitted_fasta_files)
     fasta_array = Array([])             	# specific kmers table
@@ -597,8 +580,10 @@ build_sequences() 						# create 1 file by requested sequence
         print(string("\u1b[$(nbline)F\u1b[2K"*"$x"*"\u1b[$(nbline)E"))
     end
 
+
+
     if ! unannotated_option             	# if annotated
-	name = first(split("$splitted_fasta_files",".fa"))
+        name = first(split("$splitted_fasta_files",".fa"))
         gene_name, transcript_name = split(name, ":")
         variants_dict = filter(k -> startswith(k.first, "$gene_name:"), transcriptome_dict)
         nb_variants = length(variants_dict)
@@ -632,6 +617,9 @@ build_sequences() 						# create 1 file by requested sequence
     end
     if verbose_option remotecall(replace_line, 1 , X, "worker number $(myid()), for $level $gene_name, reporting for duty ! :)\n") end
 
+
+
+
     ## building kmercounts dictionary from jellyfish query on the genome
     println("Jellyfish query -s $output/sequences/$splitted_fasta_files $jf_dir/$jf_genome")
     kmercounts_genome = read(`jellyfish query -s "$output/sequences/$splitted_fasta_files" "$jf_dir/$jf_genome"`, String)
@@ -653,6 +641,12 @@ build_sequences() 						# create 1 file by requested sequence
         seq = mer[1]
         kmercounts_transcriptome_dict["$seq"] = mer[2]
     end
+
+####################################################################################################
+###                                     PYKMERATOR STEP                                          ###
+####################################################################################################
+#~ end                                                                             ####### TO DELETE
+
 
     ## initialization of count variables
     i = 0
