@@ -312,13 +312,13 @@ end
 function run_jellyfish(genome, transcriptome_fa)
     jf_dir = "$output/jellyfish_indexes/$kmer_length"
     ## run jellyfish on transcriptome
-    ! verbose_option ? print("\r") : println("\r ------------ \n")
-    print("Running jellyfish on the transcriptome... ")
-    jf_transcriptome = replace(basename(transcriptome_fa), ".fa" => ".jf")
-    run(`mkdir -p $jf_dir`)
+#~     ! verbose_option ? print("\r") : println("\r ------------ \n")
+#~     print("Running jellyfish on the transcriptome... ")
+#~     jf_transcriptome = replace(basename(transcriptome_fa), ".fa" => ".jf")
+#~     run(`mkdir -p $jf_dir`)
     global transcriptome = "$jf_dir/$(replace(basename(transcriptome_fa), ".fa" => ".jf"))"
-    run(`jellyfish count -m $kmer_length -s 10000 -t $nbthreads -o $jf_dir/$jf_transcriptome $transcriptome_fa`)
-    if verbose_option println("\nTranscriptome kmer index output: $jf_dir/$jf_transcriptome") end
+#~     run(`jellyfish count -m $kmer_length -s 10000 -t $nbthreads -o $jf_dir/$jf_transcriptome $transcriptome_fa`)
+#~     if verbose_option println("\nTranscriptome kmer index output: $jf_dir/$jf_transcriptome") end
 
     ## run jellyfish on genome if genome is fasta file
     if occursin(r".*\.(fa|fasta)$", genome)
@@ -642,11 +642,6 @@ build_sequences() 						# create 1 file by requested sequence
         kmercounts_transcriptome_dict["$seq"] = mer[2]
     end
 
-####################################################################################################
-###                                     PYKMERATOR STEP                                          ###
-####################################################################################################
-#~ end                                                                             ####### TO DELETE
-
 
     ## initialization of count variables
     i = 0
@@ -666,6 +661,9 @@ build_sequences() 						# create 1 file by requested sequence
     kmer_starts_sorted = sort(collect(zip(values(kmer_starts),keys(kmer_starts)))) # array sorted by kmer position
     position_kmer_prev = first(kmer_starts_sorted[1])
     contig_string = ("") # initialize contig string
+
+
+
 
     for tuple in kmer_starts_sorted
         ## from the kmer/position sorted array, we extract sequence if specific (occurence ==1)
@@ -692,6 +690,13 @@ build_sequences() 						# create 1 file by requested sequence
             genome_count = kmercounts_genome_dict["$mer"]
         end
         transcriptome_count = parse(Float64, kmercounts_transcriptome_dict["$mer"])
+
+
+        ####################################################################################################
+        ###                                     PYKMERATOR STEP                                          ###
+        ####################################################################################################
+        #~ println("✨✨ position_kmer_prev: $position_kmer_prev ✨✨")
+        #~ end                                                                             ####### TO DELETE
 
         if level == "gene"
             ## if the kmer is present/unique or does not exist (splicing?) on the genome

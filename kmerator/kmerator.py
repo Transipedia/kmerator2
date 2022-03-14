@@ -26,8 +26,8 @@ def main():
     if args.verbose: print(f"{'-'*9}\n{Color.YELLOW}Args:\n{args}{Color.END}")
     checkup_args(args)
 
-    transcriptome_dict = None
-    canonical_transcripts = None
+    transcriptome_dict = {}
+    canonical_transcripts = {}
     ### when selection option is set
     if args.selection:
         ### get transcripts using Ensembl API
@@ -75,6 +75,7 @@ def build_sequences(args, transcripts=None, transcriptome_dict=None):
     create files for each transcript
     '''
     output_seq_dir = os.path.join(args.output, 'sequences')
+    removed_transcripts = []
     ### Whith --selection option
     if args.selection:
         ### Abort if no transcripts found
@@ -97,12 +98,15 @@ def build_sequences(args, transcripts=None, transcriptome_dict=None):
             ### if transcript not found
             else:
                 print(f"{Color.YELLOW} Warning: {gene[0]}/{transcript} not found in provided transcriptome.{Color.END}")
+                removed_transcripts.append(transcript)
             '''
             ### As alternative, fetch sequences with Ensembl API
             ext_ebl = f'/sequence/id/{transcript}?type=cdna;species={args.specie}'
             r = requests.get(BASE_URL+ext_ebl, headers={ "Content-Type": "text/plain"})
             seq = r.text
             '''
+        for tr in removed_transcripts:
+            transcripts.pop(tr)
     ### Whith --fasta-file option
     else:
         ### read fasta file
@@ -243,21 +247,25 @@ class SpecificKmers:
     def __init__(self, args, transcriptome_dict, canonical_transcripts):
         """ Class initialiser """
         self.args = args
-        self.transcriptome_dict = transcriptome_dict
-        self.canonical_transcripts = canonical_transcripts
+        self.rev = rev = {'A':'T', 'C':'G', 'G':'C', 'T':'A',
+                          'a':'t', 'c':'g', 'g':'c', 't':'a'}       # reverse base
+        ### create a shared dict among multiple processes
+        ### (show https://ourpython.com/python/multiprocessing-how-do-i-share-a-dict-among-multiple-processes)
+        manager = multiprocessing.Manager()
+        self.transcriptome_dict = manager.dict(transcriptome_dict)
+        self.canonical_transcripts = manager.dict(canonical_transcripts)
         ### compute Jellyfish on genome and transcriptome if not exists
-        print('JELLYFISH')
         self.jellyfish()
         ### Sequences files to analyse
-        seq_files = os.listdir(os.path.join(args.output, 'sequences'))
-        with multiprocessing.Pool(processes=args.procs) as pool:
-            results = pool.map(self.build_kmers, seq_files)
-            # ~ results.wait()
-            # ~ for res in results.get():
-                # ~ print(res)
+        self.seq_files_dir = os.path.join(self.args.output, 'sequences')
+        seq_files = os.listdir(self.seq_files_dir)
+        ### launch workers
+        with multiprocessing.Pool(processes=self.args.procs) as pool:
+            results = pool.map(self.worker, seq_files)
 
-    def build_kmers(self, seq_file):
-        """ Doc """
+
+    def worker(self, seq_file):
+        print(f"   ✨ compute {seq_file}.")
         ### Define output file names
         if self.args.selection:     # When '--selection' option is set
             gene_name, transcript_name = seq_file.split('.')[:2]
@@ -268,21 +276,90 @@ class SpecificKmers:
             tag_file = f"{gene_name}-specific_kmers.fa"
             contig_file = f"{gene_name}-specific_contigs.fa"
 
-
         ### take the transcript sequence for jellyfish query
         sequence_fasta = fasta2dict(os.path.join(self.args.output,'sequences', seq_file))
-        for desc, seq in sequence_fasta.items():
-            sequence = seq
-        print(desc)
-        time.sleep(5)   # TO DELETE
+
+        ### building kmercounts dictionary from jellyfish query on the genome
+        cmd = (f"jellyfish query -s {os.path.join(self.seq_files_dir,seq_file)} {self.args.genome}")
+        try:
+            kmercounts_genome = subprocess.run(cmd, shell=True, check=True, capture_output=True).stdout.decode().rstrip().split('\n')
+        except subprocess.CalledProcessError:
+            sys.exit(f"{Color.YELLOW}Warning: an error occured in jellyfish query command for {seq_file}:\n  {cmd}{Color.END}")
+            return None
+        kmercounts_genome_dict = {}
+        for mer in kmercounts_genome:
+            seq, count = mer.split()
+            kmercounts_genome_dict[seq] = int(count)
+
+        ### building kmercounts dictionary from jellyfish query on the transcriptome
+        cmd = (f"jellyfish query -s {os.path.join(self.seq_files_dir,seq_file)} {self.args.jellyfish_transcriptome}")
+        try:
+            kmercounts_transcriptome = subprocess.run(cmd, shell=True, check=True, capture_output=True).stdout.decode().rstrip().split('\n')
+        except subprocess.CalledProcessError:
+            print(f"{Color.YELLOW}Warning: an error occured in jellyfish query command for {seq_file}:\n  {cmd}{Color.END}")
+            return None
+        kmercounts_transcriptome_dict = {}
+        for mer in kmercounts_transcriptome:
+            seq, count = mer.split()
+            kmercounts_transcriptome_dict[seq] = int(count)
+
+        ### initialization of count variables
+        i, j = 0, 1
+        total_kmers = len(kmercounts_transcriptome_dict)
+        if self.args.verbose: print(f"[{seq_file}]: Total kmers in kmercounts_transcriptome_dict= {total_kmers}")
+
+        # ~ print(f"{total_kmers = } ({gene_name})")
+
+        ## creating a new dictionary with kmers and their first position in our query sequence
+        kmer_starts = {}
+        kmer_placed = 0
+
+        for mer in kmercounts_transcriptome_dict:
+            ### get the first position of the kmer in the sequence
+            ### EST CE VRAIMENT UTILE ???, kmercounts_transcriptome_dict ne peut de toutes façons
+            # pas contenir de doublon de kmer... idem pour sequences_fasta qui est
+            # ===> OUI, Utile si la séquence a des kmers communs
+            kmer_placed += 1
+            kmer_starts[mer] = next(iter(sequence_fasta.values())).index(mer)
+
+        if self.args.verbose: print(f"[{seq_file}]: Total kmers found in sequence_fasta = {len(kmer_starts)}")
+        ### rearrange kmer_starts as list of sorted tuple like (position, kmer)
+        kmer_starts_sorted = sorted(list(zip(kmer_starts.values(), kmer_starts.keys())))  # array sorted by kmer position
+        # ~ position_kmer_prev = first(kmer_starts_sorted[1])
+        position_kmer_prev = kmer_starts_sorted[0][0]
+        contig_string = "" # initialize contig string
+
+        ###################################################################################
+        ###              ✨✨✨✨✨✨    I AM HERE    ✨✨✨✨✨✨
+        ###################################################################################
+
+        ### for each kmer, get the count in both genome and transcriptome
+        kmers_analysed = 0
+        for tuple in kmer_starts_sorted:
+            ### from the kmer/position sorted array, we extract sequence if specific (occurence ==1)
+            mer = tuple[1]              # kmer sequence
+            position_kmer = tuple[0]    # kmer position
+            # ~ startt = time.time()
+            kmers_analysed += 1
+            per = round(kmers_analysed/total_kmers*100)     # to show percentage done ?
+
+            if mer in kmercounts_genome_dict.keys():
+                genome_count = kmercounts_genome_dict[mer]
+            else:
+                revcomp_mer = [self.rev[base] for base in mer]
+                genome_count = kmercounts_genome_dict[revcomp_mer]
+            transcriptome_count = kmercounts_transcriptome_dict[mer]
+
+        '''
+        if level == "gene"
+            ## if the kmer is present/unique or does not exist (splicing?) on the genome
+        '''
         return seq_file
 
 
+    ### Jellyfish on genome and transcriptome
     def jellyfish(self):
         args = self.args
-        ########################################################
-        ### Jellyfish on genome and transcriptome
-        ########################################################
         genome = args.genome
         ### To create jellyfish PATH DIR
         jf_dir = f"{args.output}/jellyfish_indexes/{args.kmer_length}"
@@ -301,7 +378,7 @@ class SpecificKmers:
             try:
                 subprocess.run(cmd, shell=True, check=True, capture_output=True)
             except subprocess.CalledProcessError:
-                sys.exit(f"{Color.RED}An error occured in jellyfish command:\n"
+                sys.exit(f"{Color.RED}An error occured in jellyfish count command:\n"
                          f"{cmd}{Color.END}")
 
         ### Compute jellyfish on GENOME if genome is fasta file
@@ -334,88 +411,6 @@ class SpecificKmers:
         if args.verbose:
             print(f"{Color.YELLOW}Transcriptome kmer index output: {jf_transcriptome_dest}\n"
                   f"Jellyfish done.{Color.END}")
-
-
-        '''
-        ## building kmercounts dictionary from jellyfish query on the genome
-        println("Jellyfish query -s $output/sequences/$splitted_fasta_files $jf_dir/$jf_genome")
-        kmercounts_genome = read(`jellyfish query -s "$output/sequences/$splitted_fasta_files" "$jf_dir/$jf_genome"`, String)
-        if verbose_option remotecall(replace_line, 1 , X, "jellyfish query $splitted_fasta_files on $jf_dir/$jf_genome finished") end
-        kmercounts_genome = split(kmercounts_genome, "\n")[1:end-1]
-        kmercounts_genome_dict = Dict()
-        for mer in kmercounts_genome
-            mer = split(mer)
-            seq = mer[1]
-            kmercounts_genome_dict["$seq"] = mer[2]
-        end
-        ## building kmercounts dictionary from jellyfish query on the transcriptome
-        kmercounts_transcriptome = read(`jellyfish query -s "$output/sequences/$splitted_fasta_files" "$transcriptome"`, String)
-        if verbose_option remotecall(replace_line, 1 , X, "Jellyfish query on $transcriptome done") end
-        kmercounts_transcriptome_dict = Dict()
-        kmercounts_transcriptome = split(kmercounts_transcriptome, "\n")[1:end-1]
-        for mer in kmercounts_transcriptome
-            mer = split(mer)
-            seq = mer[1]
-            kmercounts_transcriptome_dict["$seq"] = mer[2]
-        end
-        '''
-
-
-
-
-
-""" _run_jellyfish
-def _run_jellyfish(args):
-    genome = args.genome.name
-    ### create jellyfish PATH DIR
-    jf_dir = f"{args.output}/jellyfish_indexes/{args.kmer_length}"
-    os.makedirs(jf_dir, exist_ok=True)
-
-    ### Compute jellyfish on TRANSCRIPTOME
-    if args.verbose: print(f"{'-'*9}\n{Color.YELLOW}Compute Jellyfish on the transcriptome.{Color.END}")
-    jf_transcriptome_dest = f"{jf_dir}/{'.'.join(os.path.basename(args.transcriptome.name).split('.')[:-1])}.jf"
-    if os.path.exists(jf_transcriptome_dest):
-        if args.verbose: print(f"{Color.YELLOW}{jf_transcriptome_dest} already exists, remove it manually to update.{Color.END}")
-    else:
-        print(f"{Color.YELLOW}Compute Jellyfish on transcriptome{Color.END}")
-        cmd = (f"jellyfish count -m {args.kmer_length} -s 1000 -t {args.procs}"
-               f" -o {jf_transcriptome_dest} {args.transcriptome.name}")
-        try:
-            subprocess.run(cmd, shell=True, check=True, capture_output=True)
-        except subprocess.CalledProcessError:
-            sys.exit(f"{Color.RED}An error occured in jellyfish command:\n"
-                     f"{cmd}{Color.END}")
-
-    ### Compute jellyfish on GENOME if genome is fasta file
-    if args.verbose: print(f"{'-'*9}\n{Color.YELLOW}Compute Jellyfish on the genome.{Color.END}")
-    ext = args.genome.name.split('.')[-1]
-    if ext == "fa" or ext == "fasta":
-        jf_genome = '.'.join(os.path.basename(args.genome.name).split('.')[:-1]) + '.jf'
-        jf_genome_dest = os.path.join(jf_dir, jf_genome)
-        if os.path.exists(jf_genome_dest):
-            if args.verbose:
-                print(f"{Color.YELLOW}{jf_genome_dest} already exists, "
-                f"keep it (manually remove to update it).{Color.END}")
-        else:
-            print(f"{Color.YELLOW}Compute Jellyfish on genome{Color.END}.")
-            cmd = (f"jellyfish count -m {args.kmer_length} -s 1000 -t {args.cores}"
-                f" -o {jf_genome_dest} {args.genome.name}")
-            try:
-                subprocess.run(cmd, shell=True, check=True, capture_output=True)
-            except subprocess.CalledProcessError:
-                sys.exit(f"{Color.RED}An error occured in jellyfish command:\n"
-                        f"{cmd}{Color.END}")
-    else:
-        if args.verbose: print(f"{Color.YELLOW}Jellyfish genome index already provided.{Color.END}")
-        jf_genome = os.path.basename(genome)
-        jf_dir = os.path.dirname(genome)
-
-    ### Ending
-    if args.verbose:
-        print(f"{Color.YELLOW}Transcriptome kmer index output: {jf_transcriptome_dest}\n"
-              f"Jellyfish done.{Color.END}")
-    return jf_genome, jf_dir
-"""
 
 
 """ _get_canonical_transcript
@@ -601,7 +596,6 @@ def build_sequences(args, transcriptome_dict, fastafile_dict):
                         else:
                             print(f"{Color.PURPLE}Warning: {gene_name!r} sequence length < {args.kmer_length} => ignored")
 """
-
 
 
 
