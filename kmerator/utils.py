@@ -90,7 +90,7 @@ def usage():
     parser.add_argument('--stringent',
                         action='store_true',
                         help=(
-                            "FOR GENE LEVEL ONLY: use this option if you want to select "
+                            "FOR ANNOTATED GENE ONLY: use this option if you want to select "
                             "gene-specific k-mers present in ALL known transcripts for your gene. "
                             "If false, a k-mer is considered as gene-specific if present in at "
                             "least one isoform of your gene of interest."
@@ -99,8 +99,8 @@ def usage():
     parser.add_argument('--threshold',
                         type=float,
                         help=(
-                            "FOR GENE LEVEL ONLY: minimum fraction of annotated transcripts, for a "
-                            "given gene, containing this kmer to keep it (default: 0)"
+                            "FOR ANNOTATED GENE ONLY: minimum fraction of annotated transcripts, "
+                            "for a given gene, containing this kmer to keep it (default: 0)"
                             ),
                         default=0,
                         )
