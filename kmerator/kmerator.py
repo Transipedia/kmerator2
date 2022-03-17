@@ -293,32 +293,32 @@ class SpecificKmers:
         transcript is a dict when '--selection' is set, else it is a list
         '''
         ### Define some variables: gene_name, transcript_name, variants_dic and output file names
-        fasta_kmers_list = []                # specific kmers list
-        fasta_contigs_list = []             # specific contigs list
+        fasta_kmer_list = []                # specific kmers list
+        fasta_contig_list = []             # specific contigs list
         ## When '--selection' option is set
         if self.args.selection:
             transcript_name = transcript[0]         # ENST00000001
             gene_name = transcript[1][0]            # TP53
-            type = transcript[1][1]                 # 'gene' or 'transcript'
+            level = transcript[1][1]                 # 'gene' or 'transcript'
             seq_file = f"{gene_name}.{transcript_name}.fa"
             ### Define all variants for a gene
             variants_dict = { k:v for k,v in self.transcriptome_dict.items() if k.startswith(gene_name) }
             nb_variants = len(variants_dict)
             # ~ print(f"{gene_name}: {variants_dict.keys()}")
-            tag_file = f"{gene_name}-{transcript_name}-{type}-specific_kmers.fa"
-            contig_file = f"{gene_name}-{transcript_name}-{type}-specific_contigs.fa"
+            tag_file = f"{gene_name}-{transcript_name}-{level}-specific_kmers.fa"
+            contig_file = f"{gene_name}-{transcript_name}-{level}-specific_contigs.fa"
         ## When '--chimera' option is set
         elif self.args.chimera:
             seq_file = f"{transcript.replace(' ', '_').replace('/', '@SLASH@')}.fa"[:255]
             gene_name = transcript_name = transcript
-            type = 'chimera'
+            level = 'chimera'
             tag_file = f"{gene_name}-chimera-specific_kmers.fa"
             contig_file = f"{gene_name}-chimera-specific_contigs.fa"
         ## When '--fasta-file' option is set
         else:
             seq_file = f"{transcript.replace(' ', '_').replace('/', '@SLASH@')}.fa"[:255]
             gene_name = transcript_name = transcript
-            type = 'transcript'
+            level = 'transcript'
             tag_file = f"{gene_name}-transcript-specific_kmers.fa"
             contig_file = f"{gene_name}-transcript-specific_contigs.fa"
 
@@ -372,10 +372,9 @@ class SpecificKmers:
         # ~ position_kmer_prev = first(kmer_starts_sorted[1])
         position_kmer_prev = kmer_starts_sorted[0][0]
         contig_seq = "" # initialize contig sequence
-        print(gene_name, type)
         ### for each kmer, get the count in both genome and transcriptome
         kmers_analysed = 0
-        for ii,tuple in enumerate(kmer_starts_sorted):           # TO DELETE the 'i' in prod
+        for tuple in kmer_starts_sorted:
             ### from the kmer/position sorted list, we extract sequence if specific (occurence ==1)
             mer = tuple[1]              # kmer sequence
             position_kmer = tuple[0]    # kmer position
@@ -390,10 +389,9 @@ class SpecificKmers:
                 genome_count = kmercounts_genome_dict[revcomp_mer]
             transcriptome_count = kmercounts_transcriptome_dict[mer]
 
+
             ### Case of annotated genes/transcripts
-            if type == 'gene':
-                if ii == 0:
-                    print(gene_name, type)
+            if level == 'gene':
                 ## if the kmer is present/unique or does not exist (splicing?) on the genome
                 if genome_count <= 1:
                     variants_containing_this_kmer = [k for k,v in variants_dict.items() if mer in v]
@@ -401,7 +399,7 @@ class SpecificKmers:
                         # kmers case
                         i += 1
                         tmp = len(variants_containing_this_kmer)
-                        fasta_kmers_list.append(f">{gene_name}-{transcript_name}.kmer{i} ({tmp}/{nb_variants})\n{mer}")
+                        fasta_kmer_list.append(f">{gene_name}-{transcript_name}.kmer{i} ({tmp}/{nb_variants})\n{mer}")
                         # contigs case
                         if i == 1:
                             contig_seq = mer
@@ -410,16 +408,16 @@ class SpecificKmers:
                             contig_seq = f"{contig_seq}{mer[-1]}"
                             position_kmer_prev = position_kmer
                         else:
-                            fasta_contigs_list.append(f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}")
+                            fasta_contig_list.append(f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}")
                             j = j+1
                             contig_seq = mer
                             position_kmer_prev = position_kmer
                     elif not self.args.stringent and transcriptome_count == len(variants_containing_this_kmer) and transcriptome_count > nb_variants * self.args.threshold:
-                        # kmers case
+                        ### tags case
                         i += 1
                         tmp = len(variants_containing_this_kmer)
-                        fasta_kmers_list.append(f">{gene_name}-{transcript_name}.kmer{i} ({tmp}/{nb_variants})\n{mer}")
-                        # contigs case
+                        fasta_kmer_list.append(f">{gene_name}-{transcript_name}.kmer{i} ({tmp}/{nb_variants})\n{mer}")
+                        ### contigs case
                         if i == 1:
                             contig_seq = mer
                             position_kmer_prev = position_kmer
@@ -427,25 +425,52 @@ class SpecificKmers:
                             contig_seq = f"{contig_seq}{mer[-1]}"
                             position_kmer_prev = position_kmer
                         else:
-                            fasta_contigs_list.append(f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}")
+                            fasta_contig_list.append(f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}")
                             j += 1
                             contig_seq = mer
                             position_kmer_prev = position_kmer
-
 
             ###################################################################################
             ###              ✨✨✨✨✨✨    I AM HERE    ✨✨✨✨✨✨
             ###################################################################################
 
+            elif level == 'transcript':
+                if self.args.fasta_file and transcriptome_count == 0 and genome_count <= 1:
+                    ### tags case
+                    i += 1
+                    fasta_kmer_list.append(f">{gene_name}.kmer{i}\n{mer}")
+                    ### contigs case
+                    if i == 1:
+                        contig_seq = mer
+                        position_kmer_prev = position_kmer
+                    elif i > 1 and position_kmer == position_kmer_prev+1:
+                        contig_seq = f"{contig_seq}{mer[-1]}"
+                        position_kmer_prev = position_kmer
+                    else:
+                        fasta_contig_list.append(f">{gene_name}.contig{j}\n{contig_seq}")
+                        j += 1
+                        contig_seq = mer
+                        position_kmer_prev = position_kmer
+
+                elif self.args.selection and transcriptome_count == 1 and genome_count <= 1:
+                    i += 1
+                    fasta_kmer_list.append(f">{gene_name}-{transcript_name}.kmer{i}\n{mer}")
+                    # ~ print(f">{gene_name}-{transcript_name}.kmer{i}\n{mer}")                     # TO DELETE
+
+
+
             ### Case of unannotated sequences
-            else:
+            elif level == 'chimera':
                 pass
+            else:
+                sys.exit(f"{Color.RED}Error: level {level} unknown")
 
             '''
             if level == "transcript"
-                if unannotated_option && Float64(transcriptome_count) == Float64(0) && parse(Int, genome_count) <= 1
+                ...
+                elseif !unannotated_option && Float64(transcriptome_count) == Float64(1) && parse(Int, genome_count) <= 1
                     i = i+1
-                    push!(fasta_array,">$gene_name.kmer$i")
+                    push!(fasta_array,">$gene_name-$transcript_name.kmer$i")
                     push!(fasta_array,"$mer")
                     # contigs
                     if (i == 1)
@@ -461,7 +486,20 @@ class SpecificKmers:
                         contig_string = mer
                         position_kmer_prev = position_kmer
                     end
+                end
+            end
             '''
+
+        ### writting last contig
+        if level == "gene" and contig_seq:
+            fasta_contig_list = f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}"
+        elif level == "transcript" and self.args.selection and contig_seq:
+            fasta_contig_list = f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}"
+        elif (level == "chimera" or (level == "transcript" and self.args.fasta_file)) and contig_seq:
+            fasta_contig_list = f">{gene_name}.contig{j}\n{contig_seq}"
+
+        # ~ print(fasta_kmer_list)
+        print(fasta_contig_list)
 
         return seq_file
 
