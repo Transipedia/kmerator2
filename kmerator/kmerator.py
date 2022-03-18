@@ -72,16 +72,16 @@ def main():
     print(f" 🧬 Extract specific kmers.")
     kmers = SpecificKmers(args, report, transcriptome_dict, best_transcripts, unannotated_transcripts)
 
-    ### show warnings
+    ### show some final info in the prompt
     print(f"{Color.CYAN}\n Done ({len(report['done'])}):")
     for mesg in report['done']:
         print(f"  - {mesg}")
 
-    print(f"{Color.PURPLE}\n Warning ({len(report['warning'])}):")
-    for mesg in report['warning']:
-        print(f"  - {mesg}")
+    if report['warning']:
+        print(f"{Color.PURPLE}\n Warning ({len(report['warning'])}):")
+        for mesg in report['warning']:
+            print(f"  - {mesg}")
     print(f"{Color.END}")
-
 
     print(f"{Color.CYAN}\n     🪚  Penser à faire un git spécifique pour gene-info.py.{Color.END}")
     sys.exit()
