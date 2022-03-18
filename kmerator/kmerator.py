@@ -4,12 +4,24 @@
 From genes, transcripts or sequences, find specific kmers.
 
 TODO
-Maintenant, les workers prennent canonicals_transcripts() à la place de seq_files ({'ENST0001': ['TP53', 'gene']).
-C'est mieux, mais pour les unannotated, ça va poser un problème.
-solutions
-    - changer le mot canonical_transcripts et s'arranger pour mettre les info de sequences dedans en
-    récupérant/définissant les noms des fichiers
-    - lancer les workers avec une forme différente dans le cas des unannotated
+- [x] BUG du RUNX1 non trouvé dans le transcriptome v99 -> aller chercher le longest ? NOPE
+- [ ] finaliser une première version pour pypi
+- [ ] requêtes Ensembl threadées
+- [ ] requêtes Ensembl avec un timeout
+- [ ] requêtes Ensembl remplacées par le plus long transcript ???
+- [ ] SpecificKmers dans un fichier séparé ???
+- [ ] nettoyage des prints et autres bouts de codes commentés
+- [ ] Ajouter une option --report pour créer un rapport en markdown (date, auteur, commande complète, path, requêtes traitées, requêtes non traitées, etc.)
+- [ ] pour fournir un fichier à --selection
+- [ ] pour fournir un fichier de configuration
+- [ ] le nom de l'option --fasta-file n'est pas terrible
+- [ ] les genes/transcripts non traités devrait s'afficher à la fin
+- [ ] {transcript: (gene, level)} n'est pas très clair  ->  {transcript: (gene, level, provided_by)} ou provided_by est 'Ensembl' ou 'longest'
+- [ ] la création des séquences peut être multithreadée (une bonne idée ?)
+- [ ] ajouter une option --keep pour garder les fichiers intermediaires
+- [ ] ajouter une option pour aggréger les fichiers de résultats
+- [ ] ajouter dans le Pypi une commande pour générer automatiquement un transcriptome (en fonction de l'espèce se serait bien)
+- [ ] faire un paquet DEB (avec pypi2deb ou py2deb)
 """
 
 
@@ -35,20 +47,21 @@ def main():
     if args.verbose: print(f"{'-'*9}\n{Color.YELLOW}Args:\n{args}{Color.END}")
     checkup_args(args)
 
+    report = {'warning': [], 'done': []}
     transcriptome_dict = {}
-    canonical_transcripts = {}                  # when genes/transcripts annotated (--selection)
+    best_transcripts = {}                       # when genes/transcripts annotated (--selection)
     unannotated_transcripts = []                # when transcripts are unannotated (--fasta-file)
     ### when --selection option is set
     if args.selection:
         ### get transcripts using Ensembl API
         print(f" 🧬🧬 Fetch some information from Ensembl API.")
-        canonical_transcripts = _get_ensembl_transcripts(args)
+        best_transcripts = _get_ensembl_transcripts(args, report)
         ### Load transcriptome as dict (necessary to build sequences and to found specific kmers
         print(f" 🧬🧬 Load transcriptome.")
         transcriptome_dict = ebl_fasta2dict(args.transcriptome)
-        ### Build sequence using Ensembl API
+        ### Build sequence using provided transcriptome
         print(f" 🧬🧬 Build sequences.")
-        build_sequences(args, canonical_transcripts, transcriptome_dict)
+        build_sequences(args, report, best_transcripts, transcriptome_dict)
     ### when --fasta-file option is set
     else:
         print(f" 🧬🧬 Build sequences.")
@@ -56,36 +69,29 @@ def main():
 
     ### get specific kmer with multithreading
     print(f" 🧬🧬 Extract specific kmers.")
-    kmers = SpecificKmers(args, transcriptome_dict, canonical_transcripts, unannotated_transcripts)
+    kmers = SpecificKmers(args, report, transcriptome_dict, best_transcripts, unannotated_transcripts)
+
+    ### show warnings
+    print(f"{Color.CYAN}\n Done ({len(report['done'])}):")
+    for mesg in report['done']:
+        print(f"  - {mesg}")
+
+    print(f"{Color.PURPLE}\n Warning ({len(report['warning'])}):")
+    for mesg in report['warning']:
+        print(f"  - {mesg}")
+    print(f"{Color.END}")
+
 
     print(f"{Color.CYAN}\n     🪚  WORK IN PROGRESS. 🛠 next step : compute specific kmers'"
             f"\n        Et aussi : faire un git spécifique pour gene-info.py.{Color.END}")
     sys.exit()
 
-    '''
-    ### load transcriptome and fasta-file as dict
-    transcriptome_dict = None
-    fastafile_dict = None
-    if args.selection:
-        transcriptome_dict = ensembl_fasta2dict(args, args.transcriptome.name)
-        if args.verbose: print(f"{Color.YELLOW}{'-'*12}\n\nCreate transcriptome dictionnary.\n{Color.END}")
-    if args.fasta_file:
-        fastafile_dict = fasta2dict(args.fasta_file)
-        if args.verbose: print(f"{Color.YELLOW}{'-'*12}\n\nCreate input fasta file dictionnary.\n{Color.END}")
 
-    ### build jellyfish genome and transcriptome
-    jf_genome, jf_dir = _run_jellyfish(args)
-
-    ### build sequences
-    build_sequences(args, transcriptome_dict, fastafile_dict)
-    '''
-
-
-def build_sequences(args, transcripts, transcriptome_dict=None):
+def build_sequences(args, report, transcripts, transcriptome_dict=None):
     ''''
     create files for each transcript
     Be careful:
-        transcripts == canonical_transcripts  when genes/transcripts are known
+        transcripts == best_transcripts  when genes/transcripts are known
         transcripts == unannotated_transcripts  for unannotated sequences
     '''
     output_seq_dir = os.path.join(args.output, 'sequences')
@@ -98,21 +104,23 @@ def build_sequences(args, transcripts, transcriptome_dict=None):
         ### create output directory structure
         os.makedirs(output_seq_dir, exist_ok=True)
         ### Get the sequences and create files for each of them
-        for transcript,gene in transcripts.items():
-            desc = f"{gene[0]}:{transcript}"
+        for transcript,values in transcripts.items():
+            desc = f"{values[0]}:{transcript}"
             if desc in transcriptome_dict:
                 seq = transcriptome_dict[desc]
                 if len(seq) < args.kmer_length:
-                    print(f"{Color.YELLOW}Warning: {desc!r} sequence length < {args.kmer_length} => ignored{Color.END}")
+                    # ~ print(f"{Color.YELLOW}Warning: {desc!r} sequence length < {args.kmer_length} => ignored{Color.END}")
+                    report['warming'].append(f"{desc!r} sequence length < {args.kmer_length} => ignored")
                     continue
                 ### create fasta files
-                outfile = f"{gene[0].replace('.','_')}.{transcript}.fa"[:255].replace(' ', '_').replace('/', '@SLASH@')
+                outfile = f"{values[0].replace('.','_')}.{transcript}.fa"[:255].replace(' ', '_').replace('/', '@SLASH@')
                 outfile = f"{args.output}/sequences/{outfile}"
                 with open(outfile, 'w') as fh:
-                    fh.write(f">{gene[0]}:{transcript}\n{seq}")
-            ### if transcript not found
+                    fh.write(f">{values[0]}:{transcript}\n{seq}")
+            ### When transcript is not found
             else:
-                print(f"{Color.YELLOW} Warning: {gene[0]}/{transcript} not found in provided transcriptome.{Color.END}")
+                # ~ print(f"{Color.YELLOW}Warning: {values[0]}/{transcript} not found in provided transcriptome.{Color.END}")
+                report['warning'].append(f"{values[0]}/{transcript} not found in provided transcriptome.")
                 removed_transcripts.append(transcript)
             '''
             ### As alternative, fetch sequences with Ensembl API
@@ -130,14 +138,15 @@ def build_sequences(args, transcripts, transcriptome_dict=None):
         for desc,seq in fastafile_dict.items():
             outfile = f"{desc.replace(' ', '_').replace('/', '@SLASH@')}.fa"[:255]
             if len(seq) < args.kmer_length:
-                print(f"{Color.YELLOW}Warning: {desc!r} sequence length < {args.kmer_length} => ignored{Color.END}")
+                # ~ print(f"{Color.YELLOW}Warning: {desc!r} sequence length < {args.kmer_length} => ignored{Color.END}")
+                report['warning'].append(f"{desc!r} sequence length < {args.kmer_length} => ignored")
                 continue
             transcripts.append(desc)
             with open(os.path.join(output_seq_dir, outfile), 'w') as fh:
                 fh.write(f">{desc[:79]}\n{seq}")
 
 
-def _get_ensembl_transcripts(args):
+def _get_ensembl_transcripts(args, report):
     ''''
     Works with --selection option,
     - get canonical transcript and symbol name if ENSG is provided
@@ -154,7 +163,7 @@ def _get_ensembl_transcripts(args):
         ### When ENSEMBL GENE NAME is provided, get canonical transcript
         if item[:4] == 'ENSG':
             url = BASE_URL+ext_ebl+item+"?"
-            r = ebl_request(item, url, headers=headers)
+            r = ebl_request(report, item, url, headers=headers)
             if not r: continue
             transcript = r['canonical_transcript'].split('.')[0]
             symbol = r['display_name']
@@ -162,7 +171,7 @@ def _get_ensembl_transcripts(args):
         ### When ENST is provided, get symbol
         elif item[:4] == 'ENST':
             url = BASE_URL+ext_ebl+item+"?"
-            r = ebl_request(item, url, headers=headers)
+            r = ebl_request(report, item, url, headers=headers)
             if not r: continue
             if  not 'display_name' in r:
                 print(f"{Color.RED}Error: display name of {item!r} not found, it will not be processed.{Color.END}")
@@ -177,26 +186,27 @@ def _get_ensembl_transcripts(args):
         ### In other cases, item is considered as NAME_SYMBOL
         else:
             url = BASE_URL+ext_symbol+item+"?"
-            r = ebl_request(item, url, headers=headers)
+            r = ebl_request(report, item, url, headers=headers)
             if not r: continue
             for a in r:
                 if a['id'].startswith('ENSG'):
                     ensg = (a['id'])
                     url = BASE_URL+ext_ebl+ensg+"?"
-                    r = ebl_request(item, url, headers=headers)
+                    r = ebl_request(report, item, url, headers=headers)
                     transcript = r['canonical_transcript'].split('.')[0]
                     symbol = r['display_name']
                     transcripts[transcript] = [symbol, 'gene']
     return transcripts
 
 
-def ebl_request(item, url, headers):
-    r = requests.get(url, headers=headers).json()
+def ebl_request(report, item, url, headers):
+    r = requests.get(url, headers=headers)
+    r = r.json()
     if not r:
-        print(f"{Color.RED}Error: {item!r} not found by Ensembl API, it will not be processed.{Color.END}")
+        report['warning'].append(f"{item} not found by Ensembl API, it will not be processed.")
         return None
     if 'error' in r:
-        print(f"{Color.RED}Error: {r['error']}, it will not be processed.{Color.END}")
+        report['warning'].append(f"{r[error]}, it will not be processed.")
         return None
     return r
 
@@ -262,7 +272,7 @@ def ebl_fasta2dict(fasta_file):
 class SpecificKmers:
     """ Class doc """
 
-    def __init__(self, args, transcriptome_dict, canonical_transcripts, unannotated_transcripts):
+    def __init__(self, args, report, transcriptome_dict, best_transcripts, unannotated_transcripts):
         """ Class initialiser """
         self.args = args
         self.rev = rev = {'A':'T', 'C':'G', 'G':'C', 'T':'A',
@@ -271,7 +281,7 @@ class SpecificKmers:
         ### (show https://ourpython.com/python/multiprocessing-how-do-i-share-a-dict-among-multiple-processes)
         manager = multiprocessing.Manager()
         self.transcriptome_dict = manager.dict(transcriptome_dict)
-        self.canonical_transcripts = manager.dict(canonical_transcripts)
+        self.best_transcripts = manager.dict(best_transcripts)
         ### compute Jellyfish on genome and transcriptome if not exists
         self.jellyfish()
         ### Sequences files to analyse
@@ -279,14 +289,10 @@ class SpecificKmers:
         # ~ seq_files = os.listdir(self.seq_files_dir)
         ### launch workers
 
-        transcripts = canonical_transcripts.items() if args.selection else unannotated_transcripts
+        transcripts = best_transcripts.items() if args.selection else unannotated_transcripts
         with multiprocessing.Pool(processes=self.args.procs) as pool:
-            results = pool.map(self.worker, transcripts)
-            # ~ if args.selection:
-                # ~ results = pool.map(self.worker, canonical_transcripts.items())
-            # ~ else:
-                # ~ results = pool.map(self.worker, unannotated_transcripts)
-
+            mesg = pool.map(self.worker, transcripts)
+            report['done'] += mesg
 
     def worker(self, transcript):
         '''
@@ -323,7 +329,8 @@ class SpecificKmers:
             contig_file = f"{gene_name}-transcript-specific_contigs.fa"
 
 
-        print(f"   🧬 compute {seq_file}")
+        # ~ print(f"   🧬 compute {seq_file}")
+
 
         ### take the transcript sequence for jellyfish query
         sequence_fasta = fasta2dict(os.path.join(self.args.output,'sequences', seq_file))
@@ -333,7 +340,7 @@ class SpecificKmers:
         try:
             kmercounts_genome = subprocess.run(cmd, shell=True, check=True, capture_output=True).stdout.decode().rstrip().split('\n')
         except subprocess.CalledProcessError:
-            sys.exit(f"{Color.YELLOW}Warning: an error occured in jellyfish query command for {seq_file}:\n  {cmd}{Color.END}")
+            sys.exit(f"{Color.RED}Error: an error occured in jellyfish query command for {seq_file}:\n  {cmd}{Color.END}")
             return None
         kmercounts_genome_dict = {}
         for mer in kmercounts_genome:
@@ -345,7 +352,8 @@ class SpecificKmers:
         try:
             kmercounts_transcriptome = subprocess.run(cmd, shell=True, check=True, capture_output=True).stdout.decode().rstrip().split('\n')
         except subprocess.CalledProcessError:
-            print(f"{Color.YELLOW}Warning: an error occured in jellyfish query command for {seq_file}:\n  {cmd}{Color.END}")
+            # ~ print(f"{Color.YELLOW}Warning: an error occured in jellyfish query command for {seq_file}:\n  {cmd}{Color.END}")
+            self.report['warning'].append(f"an error occured in jellyfish query command for {seq_file}:\n  {cmd}")
             return None
         kmercounts_transcriptome_dict = {}
         for mer in kmercounts_transcriptome:
@@ -353,7 +361,8 @@ class SpecificKmers:
             kmercounts_transcriptome_dict[seq] = int(count)
 
         ### initialization of count variables
-        i, j = 0, 1     # ???
+        i = 0       # kmer number
+        j = 1       # contig number
         total_kmers = len(kmercounts_transcriptome_dict)
         if self.args.verbose: print(f"[{seq_file}]: Total kmers in kmercounts_transcriptome_dict= {total_kmers}")
 
@@ -413,7 +422,7 @@ class SpecificKmers:
                             contig_seq = mer
                             position_kmer_prev = position_kmer
                     elif not self.args.stringent and transcriptome_count == len(variants_containing_this_kmer) and transcriptome_count > nb_variants * self.args.threshold:
-                        ### tags case
+                        ### kmers case
                         i += 1
                         tmp = len(variants_containing_this_kmer)
                         fasta_kmer_list.append(f">{gene_name}-{transcript_name}.kmer{i} ({tmp}/{nb_variants})\n{mer}")
@@ -430,13 +439,9 @@ class SpecificKmers:
                             contig_seq = mer
                             position_kmer_prev = position_kmer
 
-            ###################################################################################
-            ###              ✨✨✨✨✨✨    I AM HERE    ✨✨✨✨✨✨
-            ###################################################################################
-
             elif level == 'transcript':
                 if self.args.fasta_file and transcriptome_count == 0 and genome_count <= 1:
-                    ### tags case
+                    ### kmers case
                     i += 1
                     fasta_kmer_list.append(f">{gene_name}.kmer{i}\n{mer}")
                     ### contigs case
@@ -453,55 +458,71 @@ class SpecificKmers:
                         position_kmer_prev = position_kmer
 
                 elif self.args.selection and transcriptome_count == 1 and genome_count <= 1:
+                    ### kmers case
                     i += 1
                     fasta_kmer_list.append(f">{gene_name}-{transcript_name}.kmer{i}\n{mer}")
                     # ~ print(f">{gene_name}-{transcript_name}.kmer{i}\n{mer}")                     # TO DELETE
-
-
+                    ### contigs case
+                    if i == 1:
+                        contig_seq = mer
+                        position_kmer_prev = position_kmer
+                    elif i > 1 and position_kmer == position_kmer_prev + 1:
+                        contig_seq = f"{contig_seq}{mer[-1]}"
+                        position_kmer_prev = position_kmer
+                    else:
+                        fasta_contig_list.append(f">{gene_name}.contig{j}\n{contig_seq}")
+                        # ~ print(f">{gene_name}.contig{j}\n{contig_seq}")                              # TO DELETE
+                        j += 1
+                        contig_seq = mer
+                        position_kmer_prev = position_kmer
 
             ### Case of unannotated sequences
             elif level == 'chimera':
-                pass
+                if transcriptome_count == genome_count == 0:
+                    ### kmers case
+                    i += 1
+                    fasta_kmer_list.append(f">{gene_name}.kmer{i}\n{mer}")
+                    ### contig case
+                    if i == 1:
+                        contig_seq = mer
+                        position_kmer_prev = position_kmer
+                    elif i > 1 and position_kmer == position_kmer_prev + 1:
+                        contig_seq = f"{contig_seq}{mer[-1]}"
+                        position_kmer_prev = position_kmer
+                    else:
+                        fasta_contig_list.append(f">{gene_name}.contig{j}\n{contig_seq}")
+                        j += 1
+                        contig_seq = mer
+                        position_kmer_prev = position_kmer
             else:
                 sys.exit(f"{Color.RED}Error: level {level} unknown")
 
-            '''
-            if level == "transcript"
-                ...
-                elseif !unannotated_option && Float64(transcriptome_count) == Float64(1) && parse(Int, genome_count) <= 1
-                    i = i+1
-                    push!(fasta_array,">$gene_name-$transcript_name.kmer$i")
-                    push!(fasta_array,"$mer")
-                    # contigs
-                    if (i == 1)
-                        contig_string = mer
-                        position_kmer_prev = position_kmer
-                    elseif (i>1 && Int64(position_kmer) == Int64(position_kmer_prev+1))
-                        contig_string = string(contig_string,mer[end])
-                        position_kmer_prev = position_kmer
-                    else
-                        push!(fasta_contig_array,">$gene_name.contig$j")
-                        push!(fasta_contig_array,"$contig_string")
-                        j = j+1
-                        contig_string = mer
-                        position_kmer_prev = position_kmer
-                    end
-                end
-            end
-            '''
-
-        ### writting last contig
+        ### append last contig in list
         if level == "gene" and contig_seq:
-            fasta_contig_list = f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}"
+            fasta_contig_list.append(f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}")
         elif level == "transcript" and self.args.selection and contig_seq:
-            fasta_contig_list = f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}"
+            fasta_contig_list.append(f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}")
         elif (level == "chimera" or (level == "transcript" and self.args.fasta_file)) and contig_seq:
-            fasta_contig_list = f">{gene_name}.contig{j}\n{contig_seq}"
+            fasta_contig_list.append(f">{gene_name}.contig{j}\n{contig_seq}")
 
-        # ~ print(fasta_kmer_list)
-        print(fasta_contig_list)
+        # ~ print(fasta_kmer_list)      # debug
+        # ~ print(fasta_contig_list)    # debug
 
-        return seq_file
+        ## write tag files
+        if fasta_kmer_list:
+            tags_outdir = os.path.join(self.args.output, 'tags', str(self.args.kmer_length))
+            os.makedirs(tags_outdir, exist_ok=True)
+            with open(os.path.join(tags_outdir, tag_file), 'w') as fh:
+                fh.write("\n".join(fasta_kmer_list) + '\n')
+        if fasta_contig_list:
+            contigs_outdir = os.path.join(self.args.output, 'contigs', str(self.args.kmer_length))
+            os.makedirs(contigs_outdir, exist_ok=True)
+            with open(os.path.join(contigs_outdir, contig_file), 'w') as fh:
+                fh.write("\n".join(fasta_contig_list) + '\n')
+
+        mesg = (f"{gene_name}:{transcript_name} (as {level}).")
+
+        return mesg
 
 
     ### Jellyfish on genome and transcriptome
