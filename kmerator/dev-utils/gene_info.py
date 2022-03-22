@@ -25,7 +25,7 @@ def main():
         ### find type (ensembl, ncbi ..., otherwise symbol name)
         type = get_gene_type(gene)
         ### try to find info on gene
-        info = fetch_info(gene, type)
+        info = fetch_info(args, gene, type)
         ### output results
         output(gene, type, info)
 
@@ -61,13 +61,13 @@ def output(gene, type, info):
         print(f"Input: {gene} (NOT FOUND)")
 
 
-def fetch_info(gene, type):
+def fetch_info(args, gene, type):
     '''
     Depending on the type (ensembl, ncbi, symbol name), try to find information about the gene
     '''
     ensg = gene
     if type == 'SYMBOL':
-        ensg = _get_ENSG_from_SYMBOL(gene)
+        ensg = _get_ENSG_from_SYMBOL(args, gene)
     info = _ensembl_lookup(ensg) if ensg else None
     return info
 
@@ -75,20 +75,28 @@ def fetch_info(gene, type):
 def _ensembl_lookup(gene):
     server = "https://rest.ensembl.org"
     ext = "/lookup/id/"
-    r = requests.get(server+ext+gene+"?", headers={ "Content-Type" : "application/json"})
+    try:
+        r = requests.get(server+ext+gene+"?", headers={ "Content-Type" : "application/json"})
+    except:
+        sys.exit('GLOP PAS')
     if not r.ok:
         return None
     return r.json()
 
 
-def _get_ENSG_from_SYMBOL(gene):
+def _get_ENSG_from_SYMBOL(args, gene):
     server = "https://rest.ensembl.org"
-    ext = "/xrefs/symbol/homo_sapiens/"
-    r = requests.get(server+ext+gene+"?", headers={ "Content-Type" : "application/json"})
+    ext = f"/xrefs/symbol/{args.specie}/"
+    try:
+        r = requests.get(server+ext+gene+"?", headers={ "Content-Type" : "application/json"})
+    except:
+        sys.exit('PAS GLOP')
+    if 'error' in r.json():
+        sys.exit(r.json()['error'])
     if not r.ok:
-        print(r.raise_for_status())
+        sys.exit(r.raise_for_status())
     if not r.json(): return None
-    ensg = [item['id'] for item in r.json() if item['id'].startswith('ENSG')][0]
+    ensg = [item['id'] for item in r.json() if item['id'].startswith('ENS')][0]
     return ensg
 
 
@@ -154,14 +162,12 @@ def usage():
                         default=genes,
                         metavar=('gene'),
                        )
-    '''
-    ### ARGUMENT WITH OPTION
-    parser.add_argument("-g", "--genome",
-                        help="génome de référence",
-                        metavar="genome",
-                        nargs=1,
-                        required=True,
+    parser.add_argument("-s", "--specie",
+                        help="specie",
+                        metavar="specie",
+                        default='homo_sapiens',
                        )
+    '''
     ### ARGUMENT WITHOUT OPTION
     parser.add_argument('--verbose',
                         action="store_true",          # boolean

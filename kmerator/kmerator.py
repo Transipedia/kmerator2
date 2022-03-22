@@ -4,7 +4,12 @@
 From genes, transcripts or sequences, find specific kmers.
 
 TODO
+- [ ] faire un test pour la souris
+- [✔] kmerator.py : si le jellyfish du transcriptome est au même endroit (et avec le meme nom) que le .fa, le gérer automatiquement.
+- [✔] Vérifier que la casse est gérées
+- [✔] aujourdh'ui, plantage sur Ensembl (ddos sur les dns ?) avec un "ConnectionError" ==> message warning + se rabattre sur les plus longs transcripts
 - [x] BUG du RUNX1 non trouvé dans le transcriptome v99 -> pas vraiment un bug.
+- [ ] supprimer les sous-répertoire '31'
 - [ ] finaliser une première version pour pypi
 - [ ] requêtes Ensembl threadées
 - [ ] requêtes Ensembl avec un timeout
@@ -15,17 +20,15 @@ TODO
 - [ ] pouvoir fournir un fichier à --selection
 - [ ] pouvoir fournir un fichier de configuration
 - [ ] le nom de l'option --fasta-file n'est pas terrible
-- [✔] les genes/transcripts non traités devrait s'afficher à la fin
+- [✔] les genes/transcripts non traités devraient s'afficher à la fin
 - [✔] {transcript: (gene, level)} n'est pas très clair  ->  {transcript: (gene, level, provided_by)} ou provided_by est 'Ensembl' ou 'longest'
 - [ ] la création des séquences peut être multithreadée (une bonne idée ?)
-- [ ] ajouter une option --keep pour garder les fichiers intermédiaires
+- [ ] ajouter une option --keep pour garder les fichiers intermédiaires (et sinon les supprimer)
 - [ ] ajouter une option pour aggréger les fichiers de résultats
 - [ ] ajouter dans le Pypi une commande pour générer automatiquement un transcriptome (en fonction de l'espèce se serait bien)
 - [ ] ajouter dans le Pypi une commande qui renvoie la liste des espèces gérées par Ensembl
 - [ ] faire un paquet DEB (avec pypi2deb ou py2deb)
 """
-
-
 
 
 import sys
@@ -46,18 +49,22 @@ def main():
     ### Handle arguments
     args = usage()
     if args.verbose: print(f"{'-'*9}\n{Color.YELLOW}Args:\n{args}{Color.END}")
+
+    ### check options
     checkup_args(args)
 
-    report = {'warning': [], 'done': []}
+    ### some variables
+    report = {'aborted': [], 'done': []}
     transcriptome_dict = {}
     best_transcripts = {}                       # when genes/transcripts annotated (--selection)
     unannotated_transcripts = []                # when transcripts are unannotated (--fasta-file)
+
     ### when --selection option is set
     if args.selection:
         ### get transcripts using Ensembl API
         print(f" 🧬 Fetch some information from Ensembl API.")
         best_transcripts = _get_ensembl_transcripts(args, report)
-        ### Load transcriptome as dict (necessary to build sequences and to found specific kmers
+        ### Load transcriptome as dict (needed to build sequences and to found specific kmers
         print(f" 🧬 Load transcriptome.")
         transcriptome_dict = ebl_fasta2dict(args.transcriptome)
         ### Build sequence using provided transcriptome
@@ -73,18 +80,13 @@ def main():
     kmers = SpecificKmers(args, report, transcriptome_dict, best_transcripts, unannotated_transcripts)
 
     ### show some final info in the prompt
-    print(f"{Color.CYAN}\n Done ({len(report['done'])}):")
-    for mesg in report['done']:
-        print(f"  - {mesg}")
+    show_info(report)
 
-    if report['warning']:
-        print(f"{Color.PURPLE}\n Warning ({len(report['warning'])}):")
-        for mesg in report['warning']:
-            print(f"  - {mesg}")
-    print(f"{Color.END}")
+    ### set markdown report
+    markdown_report(args, report)
 
-    print(f"{Color.CYAN}\n     🪚  Penser à faire un git spécifique pour gene-info.py.{Color.END}")
-    sys.exit()
+    ### ending
+    gracefully_exit(args)
 
 
 def build_sequences(args, report, transcripts, transcriptome_dict=None):
@@ -120,7 +122,7 @@ def build_sequences(args, report, transcripts, transcriptome_dict=None):
             ### When transcript is not found
             else:
                 # ~ print(f"{Color.YELLOW}Warning: {values[0]}/{transcript} not found in provided transcriptome.{Color.END}")
-                report['warning'].append(f"{values[0]}/{transcript} not found in provided transcriptome.")
+                report['aborted'].append(f"{values[0]}/{transcript} not found in provided transcriptome.")
                 removed_transcripts.append(transcript)
             '''
             ### As alternative, fetch sequences with Ensembl API
@@ -139,7 +141,7 @@ def build_sequences(args, report, transcripts, transcriptome_dict=None):
             outfile = f"{desc.replace(' ', '_').replace('/', '@SLASH@')}.fa"[:255]
             if len(seq) < args.kmer_length:
                 # ~ print(f"{Color.YELLOW}Warning: {desc!r} sequence length < {args.kmer_length} => ignored{Color.END}")
-                report['warning'].append(f"{desc!r} sequence length < {args.kmer_length} => ignored")
+                report['aborted'].append(f"{desc!r} sequence length < {args.kmer_length} => ignored")
                 continue
             transcripts.append(desc)
             with open(os.path.join(output_seq_dir, outfile), 'w') as fh:
@@ -160,21 +162,13 @@ def _get_ensembl_transcripts(args, report):
     ext_ebl = "/lookup/id/"                         # extension to get info with ENSG/ENST
     headers={ "Content-Type" : "application/json"}  # header for the query
     for item in args.selection:
-        ### When ENSEMBL GENE NAME is provided, get canonical transcript
-        if item[:4] == 'ENSG':
-            url = BASE_URL+ext_ebl+item+"?"
-            r = ebl_request(report, item, url, headers=headers)
-            if not r: continue
-            transcript = r['canonical_transcript'].split('.')[0]
-            symbol = r['display_name']
-            transcripts[transcript] = [symbol, 'gene']
         ### When ENST is provided, get symbol
-        elif item[:4] == 'ENST':
+        if item.startswith('ENST'):
             url = BASE_URL+ext_ebl+item+"?"
             r = ebl_request(report, item, url, headers=headers)
             if not r: continue
             if  not 'display_name' in r:
-                print(f"{Color.RED}Error: display name of {item!r} not found, it will not be processed.{Color.END}")
+                print(f"display name of {item!r} not found from Ensembl API.")
                 continue
             transcript = item.split('.')[0]
             symbol = r['display_name'].split('-')[0]
@@ -183,13 +177,22 @@ def _get_ensembl_transcripts(args, report):
             # ~ transcript = r.json()['canonical_transcript'].split('.')[0]
             # ~ symbol = r.json()['display_name']
             transcripts[transcript] = [symbol, 'transcript']
+        ### When ENSEMBL GENE NAME is provided, get canonical transcript
+        elif item.startswith('ENS'):
+            url = BASE_URL+ext_ebl+item+"?"
+            r = ebl_request(report, item, url, headers=headers)
+            if not r: continue
+            transcript = r['canonical_transcript'].split('.')[0]
+            symbol = r['display_name']
+            transcripts[transcript] = [symbol, 'gene']
         ### In other cases, item is considered as NAME_SYMBOL
         else:
             url = BASE_URL+ext_symbol+item+"?"
             r = ebl_request(report, item, url, headers=headers)
-            if not r: continue
-            for a in r:
-                if a['id'].startswith('ENSG'):
+            if not r:
+                continue
+            for a in r:     # r is a dict list
+                if a['id'].startswith('ENS'):
                     ensg = (a['id'])
                     url = BASE_URL+ext_ebl+ensg+"?"
                     r = ebl_request(report, item, url, headers=headers)
@@ -200,13 +203,16 @@ def _get_ensembl_transcripts(args, report):
 
 
 def ebl_request(report, item, url, headers):
-    r = requests.get(url, headers=headers)
+    try:
+        r = requests.get(url, headers=headers)
+    except requests.ConnectionError as err:
+        sys.exit(f"{Color.RED}\n Error: Ensembl is not accessible or not responding.{Color.END}")
     r = r.json()
     if not r:
-        report['warning'].append(f"{item} not found by Ensembl API, it will not be processed.")
+        report['aborted'].append(f"{item} not found from Ensembl API.")
         return None
     if 'error' in r:
-        report['warning'].append(f"{r[error]}, it will not be processed.")
+        report['aborted'].append(f"{r[error]}.")
         return None
     return r
 
@@ -351,7 +357,6 @@ class SpecificKmers:
         try:
             kmercounts_transcriptome = subprocess.run(cmd, shell=True, check=True, capture_output=True).stdout.decode().rstrip().split('\n')
         except subprocess.CalledProcessError:
-            # ~ print(f"{Color.YELLOW}Warning: an error occured in jellyfish query command for {seq_file}:\n  {cmd}{Color.END}")
             self.report['warning'].append(f"an error occured in jellyfish query command for {seq_file}:\n  {cmd}")
             return None
         kmercounts_transcriptome_dict = {}
@@ -396,7 +401,6 @@ class SpecificKmers:
                 revcomp_mer = [self.rev[base] for base in mer]
                 genome_count = kmercounts_genome_dict[revcomp_mer]
             transcriptome_count = kmercounts_transcriptome_dict[mer]
-
 
             ### Case of annotated genes/transcripts
             if level == 'gene':
@@ -536,8 +540,22 @@ class SpecificKmers:
 
         ### Compute jellyfish on TRANSCRIPTOME
         if args.verbose: print(f"{'-'*9}\n{Color.YELLOW}Compute Jellyfish on the transcriptome.{Color.END}")
+        root_path = '.'.join(args.transcriptome.split('.')[:-1])
+        root_basename = os.path.basename(root_path)
+        jelly_candidate = f"{root_path}.jf"
+        jelly_dest = f"{jf_dir}/{root_basename}.jf"
+        ### check for existing jellyfish transcriptome
         if not args.jellyfish_transcriptome:
-            args.jellyfish_transcriptome = f"{jf_dir}/{'.'.join(os.path.basename(args.transcriptome).split('.')[:-1])}.jf"
+            ### at the same location of fasta transcriptome
+            if os.path.isfile(jelly_candidate):
+                args.jellyfish_transcriptome = jelly_candidate
+            ### where the jellyfich file must be created
+            if os.path.isfile(jelly_dest):
+                args.jellyfish_transcriptome = jelly_dest
+        ### do jellyfish on transcriptome fasta file
+        if not args.jellyfish_transcriptome:
+            tr_root_file = '.'.join(os.path.basename(args.transcriptome).split('.')[:-1])
+            args.jellyfish_transcriptome = f"{jf_dir}/{tr_root_file}.jf"
             print(" 🧬 Compute Jellyfish on the transcriptome, please wait...")
             mk_jfdir(jf_dir)
             cmd = (f"jellyfish count -m {args.kmer_length} -s 1000 -t {args.procs}"
@@ -578,6 +596,29 @@ class SpecificKmers:
         if args.verbose:
             print(f"{Color.YELLOW}Transcriptome kmer index output: {jf_transcriptome_dest}\n"
                   f"Jellyfish done.{Color.END}")
+
+
+def show_info(report):
+    ### show some final info in the prompt
+    print(f"{Color.CYAN}\n Done ({len(report['done'])}):")
+    for mesg in report['done']:
+        print(f"  - {mesg}")
+
+    if report['aborted']:
+        print(f"{Color.PURPLE}\n Aborted ({len(report['aborted'])}):")
+        for mesg in report['aborted']:
+            print(f"  - {mesg}")
+    print(f"{Color.END}")
+
+    print(f"{Color.CYAN}\n     🪚  Penser à faire un git spécifique pour gene-info.py.{Color.END}")
+
+
+def markdown_report(args, report):
+    pass
+
+
+def gracefully_exit(args):
+    pass
 
 
 """ _get_canonical_transcript
@@ -763,8 +804,6 @@ def build_sequences(args, transcriptome_dict, fastafile_dict):
                         else:
                             print(f"{Color.PURPLE}Warning: {gene_name!r} sequence length < {args.kmer_length} => ignored")
 """
-
-
 
 
 
