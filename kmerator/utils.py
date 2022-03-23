@@ -21,25 +21,28 @@ def usage():
     query_type = parser.add_mutually_exclusive_group(required=True)
     query_type.add_argument('-s', '--selection',
                             help=(
-                                "list of gene IDs or transcript IDs (ENSG, ENST or gene Symbol) to "
+                                "list of gene IDs or transcript IDs (ENST, ENS or gene Symbol) to "
                                 "select inside your fasta transcriptome file and that you want to "
-                                "extract specific kmers from. If you want to use your own "
-                                "sequences, you can give your fasta file with --fasta_file option."
+                                "extract specific kmers from. For genes, kmerator search specific "
+                                " kmers along the gene. For transcripts, it search specific kmers "
+                                "to the transcript. You can also give a file with yours "
+                                "genes/transcripts. If you want to use your own sequences, you "
+                                "must give your fasta file with --fasta_file option."
                                 ),
                             nargs='+',
                             )
     query_type.add_argument('-f', '--fasta-file',
                             # ~ type=argparse.FileType('r'),
                             help=(
-                                "Use this option when yours sequences are unannonated or provided"
-                                "by a annotation file external from Ensembl. Otherwise,"
+                                "Use this option when yours sequences are unannonated or provided "
+                                "by a annotation file external from Ensembl. Otherwise, "
                                 "use --selection option."
                                 ),
                             )
     parser.add_argument('-g', '--genome',
                         # ~ type=argparse.FileType('r'),
                         help=(
-                            "genome fasta file or jellyfish index (.jf) to use for k-mers request."
+                            "genome fasta file or jellyfish index (.jf) to use for k-mers requests."
                             ),
                         required=True,
                         )
