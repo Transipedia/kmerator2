@@ -4,7 +4,7 @@
 From genes, transcripts or sequences, find specific kmers.
 
 TODO
-- [ ] BUG: le transcript ENST00000621131 (VPS29) n'a pas été fait !!!!
+- [ ] BUG: le transcript ENST00000621131 (VPS29) n'a pas été fait !!!! Même si aucun kmer trouvé, il faudrait créer un fichier vide... Mis quoi mettre dans le merged ?
 - [ ] BUG: Si je lui donne un ENSG, je ne retrouve pas le nom ensuite (car transformé en gene-SYMBOL) --> mettre son nom dans 'transcripts'
 - [ ] faire un test pour la souris
 - [✔] kmerator.py : si le jellyfish du transcriptome est au même endroit (et avec le meme nom) que le .fa, le gérer automatiquement.
@@ -135,9 +135,8 @@ def build_sequences(args, report, transcripts, transcriptome_dict=None):
         os.makedirs(output_seq_dir, exist_ok=True)
         ### Get the sequences and create files for each of them
         for transcript,values in transcripts.items():
-            desc = f"{values[0]}:{transcript}"
-            if desc in transcriptome_dict:
-                seq = transcriptome_dict[desc]
+            if transcript in transcriptome_dict:
+                seq = transcriptome_dict[transcript]
                 if len(seq) < args.kmer_length:
                     report['warming'].append(f"{desc!r} sequence length < {args.kmer_length} => ignored")
                     continue
@@ -289,9 +288,10 @@ def ebl_fasta2dict(fasta_file):
         old_desc, new_desc = "", ""
         for line in fh:
             if line[0] == ">":
-                gene_name = line.split()[6].split(':')[1]
+                # ~ gene_name = line.split()[6].split(':')[1]
                 transcript_name = line.split('.')[0].lstrip('>')
-                new_desc = f"{gene_name}:{transcript_name}"
+                # ~ new_desc = f"{gene_name}:{transcript_name}"
+                new_desc = transcript_name
                 if old_desc:
                     fasta_dict[old_desc] = seq
                     seq = ""
