@@ -4,8 +4,9 @@
 From genes, transcripts or sequences, find specific kmers.
 
 TODO
+- [ ] voir si des noms HUGO ou GENE SYMBOL commencent par ENS ==> sinon problème car il cherchera un ENS ENSEMBL au lieu de GENE SYMBOL (ligne 213 : elif item.startswith('ENS'):)
 - [ ] BUG: le transcript ENST00000621131 (VPS29) n'a pas été fait !!!! Même si aucun kmer trouvé, il faudrait créer un fichier vide... Mis quoi mettre dans le merged ?
-- [ ] BUG: Si je lui donne un ENSG, je ne retrouve pas le nom ensuite (car transformé en gene-SYMBOL) --> mettre son nom dans 'transcripts'
+- [ ] BUG: Si je lui donne un ENSG, je ne retrouve pas le nom ensuite (car transformé en gene-SYMBOL) --> mettre son nom dans 'transcripts' (ligne 222 : transcripts[transcript] = [symbol, 'gene'])
 - [ ] faire un test pour la souris
 - [✔] kmerator.py : si le jellyfish du transcriptome est au même endroit (et avec le meme nom) que le .fa, le gérer automatiquement.
 - [✔] Vérifier que la casse est gérées
@@ -135,8 +136,9 @@ def build_sequences(args, report, transcripts, transcriptome_dict=None):
         os.makedirs(output_seq_dir, exist_ok=True)
         ### Get the sequences and create files for each of them
         for transcript,values in transcripts.items():
-            if transcript in transcriptome_dict:
-                seq = transcriptome_dict[transcript]
+            desc = f"{values[0]}:{transcript}"
+            if desc in transcriptome_dict:
+                seq = transcriptome_dict[desc]
                 if len(seq) < args.kmer_length:
                     report['warming'].append(f"{desc!r} sequence length < {args.kmer_length} => ignored")
                     continue
@@ -162,10 +164,14 @@ def build_sequences(args, report, transcripts, transcriptome_dict=None):
         ### read fasta file
         if args.verbose: print(f"{Color.YELLOW}{'-'*12}\n\nBuild sequences without transcriptome.\n{Color.END}")
         fastafile_dict = fasta2dict(args.fasta_file)
+        ### Abort if dict empy
+        if not fastafile_dict:
+            sys.exit(f"{Color.RED}Error: no sequence found for {args.fasta_file}")
+        ### create output directory structure
+        os.makedirs(output_seq_dir, exist_ok=True)
         for desc,seq in fastafile_dict.items():
             outfile = f"{desc.replace(' ', '_').replace('/', '@SLASH@')}.fa"[:255]
             if len(seq) < args.kmer_length:
-                # ~ print(f"{Color.YELLOW}Warning: {desc!r} sequence length < {args.kmer_length} => ignored{Color.END}")
                 report['aborted'].append(f"{desc!r} sequence length < {args.kmer_length} => ignored")
                 continue
             transcripts.append(desc)
@@ -209,7 +215,10 @@ def get_ensembl_transcripts(args, report):
             r = ebl_request(report, item, url, headers=headers)
             if not r: continue
             transcript = r['canonical_transcript'].split('.')[0]
-            symbol = r['display_name']
+            if 'display_name' in r:
+                symbol = r['display_name']
+            else:
+                symbol = r['id']
             transcripts[transcript] = [symbol, 'gene']
         ### In other cases, item is considered as NAME_SYMBOL
         else:
@@ -288,10 +297,14 @@ def ebl_fasta2dict(fasta_file):
         old_desc, new_desc = "", ""
         for line in fh:
             if line[0] == ">":
-                # ~ gene_name = line.split()[6].split(':')[1]
-                transcript_name = line.split('.')[0].lstrip('>')
-                # ~ new_desc = f"{gene_name}:{transcript_name}"
-                new_desc = transcript_name
+                line = line.split()
+                if len(line) > 6:
+                    gene_name = line[6].split(':')[1]                    # gene symbol
+                else:
+                    gene_name = line[3].split(':')[1].split('.')[0]      # ENSG
+                transcript_name = line[0].split('.')[0].lstrip('>')
+                new_desc = f"{gene_name}:{transcript_name}"
+                # ~ new_desc = transcript_name
                 if old_desc:
                     fasta_dict[old_desc] = seq
                     seq = ""
@@ -341,6 +354,9 @@ class SpecificKmers:
             level = transcript[1][1]                 # 'gene' or 'transcript'
             seq_file = f"{gene_name}.{transcript_name}.fa"
             ### Define all variants for a gene
+            # ~ for k,a in self.transcriptome_dict.items():
+                # ~ print(k,a)
+                # ~ break
             variants_dict = { k:v for k,v in self.transcriptome_dict.items() if k.startswith(gene_name) }
             nb_variants = len(variants_dict)
             # ~ print(f"{gene_name}: {variants_dict.keys()}")
@@ -620,7 +636,7 @@ class SpecificKmers:
 
 
 def merged_results(args):
-    if not os.path.isdir(args.output):
+    if not os.path.isdir(os.path.join(args.output, 'tags')):
         return None
     for item in ['tags', 'contigs']:
         files = os.listdir(os.path.join(args.output, item))
