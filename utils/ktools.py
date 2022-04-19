@@ -87,7 +87,6 @@ class MkTranscripts:
         self.exit_gracefully(args, downloaded_fasta, temp_fasta_files)
 
 
-
     def get_link(self, base_url, item):
         if item == 'cdna':
             pattern = 'cdna.all.fa.gz'
@@ -187,7 +186,7 @@ class MkTranscripts:
             print(f"Notice: {transcriptome_fa!r} already exists, it will be overwritten.")
 
         ### concatene cDNA and ncRNA
-        print(f"creating final file {transcriptome_fa!r}")
+        print(f"creating transcriptome {os.path.basename(transcriptome_fa)!r}")
         with open(transcriptome_fa, 'w') as outfile:
             for fasta in temp_fasta_files:
                 with open(fasta, 'r') as infile:
@@ -205,7 +204,36 @@ class MkTranscripts:
 
     def mk_index(self, args, transcriptome_fa):
         """ Function doc """
-        print("Make index from transcriptome: work in progress..")
+        ### Select best tool to indexing transcriptome
+        tools = ['_kmc', 'jellyfish']
+        num = None
+        for i,bin in enumerate(tools):
+            if shutil.which(bin):
+                num = i
+                break
+        if not num:
+            print(f"Warning: no tool found to index the transcriptome")
+            return None
+
+        ### Define command line according to the tool used
+        ''' in the future (python 3.10)
+        match tools[num]:
+            case 'kmc':
+                print(f"prefered tool: {os.path.basename(tool)}")
+            case 'jellyfish':
+                cmd = f"{tool} count -m 31 -s 100000 {transcriptome_fa} -o {transcriptome_idx}"
+        '''
+        tool = tools[num]
+        ## kmc case
+        if tool == 'kmc': print(f"prefered tool: {os.path.basename(tool)}")
+        ## jellyfish case
+        elif tool == 'jellyfish':
+            transcriptome_idx = f"{os.path.splitext(transcriptome_fa)[0]}.jf"
+            cmd = f"{tool} count -t 8 -m 31 -s 100000 {transcriptome_fa} -o {transcriptome_idx}"
+
+        ### Build index
+        print(f"Build index with {tool!r}, please wait...")
+        ret = os.system(cmd)
 
 
     def exit_gracefully(self, args, downloaded_fasta, temp_fasta_files):
