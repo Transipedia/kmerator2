@@ -29,7 +29,7 @@ setuptools.setup(
         ],
     },
     include_package_data = True,
-    install_requires=['PyYAML'],
+    install_requires=['PyYAML', 'bs4'],
     python_requires = ">=3.6",
     licence = "GPLv3"
 )

@@ -229,7 +229,7 @@ class MkTranscripts:
         ## jellyfish case
         elif tool == 'jellyfish':
             transcriptome_idx = f"{os.path.splitext(transcriptome_fa)[0]}.jf"
-            cmd = f"{tool} count -t 8 -m 31 -s 100000 {transcriptome_fa} -o {transcriptome_idx}"
+            cmd = f"{tool} count -t {args.thread} -m 31 -s 100000 {transcriptome_fa} -o {transcriptome_idx}"
 
         ### Build index
         print(f"Build index with {tool!r}, please wait...")
@@ -262,8 +262,8 @@ def usage():
 
     ### OPTION
     global_parser.add_argument('-o', '--output',
-                        help = "output directory (default: output)",
-                        default="output",
+                        help = "output directory (default: .)",
+                        default=".",
                        )
     parser_mk_tcrptome = subparsers.add_parser('mk-transcripts',
                         parents = [global_parser],
@@ -281,6 +281,11 @@ def usage():
     parser_mk_tcrptome.add_argument('-k', '--keep',
                         action="store_true",          # boolean
                         help="Keep intermediates files",
+                       )
+    parser_mk_tcrptome.add_argument('-t', '--thread',
+                        type=int,
+                        help="number of trhead (defaul: 1)",
+                        default=1,
                        )
     parser.add_argument('-v', '--version',
                         action='version',
