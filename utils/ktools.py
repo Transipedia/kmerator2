@@ -3,8 +3,19 @@
 """
 tools for Kmerator
 
-- mk-transcripts: build transcriptome for a specie
+- mk-transcripts: build a transcriptome and his jellyfish index for a specie
+- mk-genome: build a genome and his jellyfish index for a specie --- WORK IN PROGRESS
+- list-species: list all species available from Ensembl API --- WORK IN PROGRESS
+"""
 
+"""
+TODO LIST
+- [ ] ADD: mk-genome to create genome and jellyfish of genome
+- [ ] ADD: list-species to show all species available from Ensembl API
+- [ ] ADD: more species (find if specie is available using ebl-species.py)
+- [ ] ADD: mk-transcripts: for current release, use date or size or both to not update if it's seems the same
+- [ ] ADD: Handle Ctrl + C
+- [ ] ADD: Handle alternative to jellyfish, like kmc and kmtricks
 """
 
 
@@ -278,14 +289,14 @@ def usage():
     parser_mk_tcrptome.add_argument('-r', '--release',
                         help="Encode version of transcriptome to dowload (default: current)",
                         )
-    parser_mk_tcrptome.add_argument('-k', '--keep',
-                        action="store_true",          # boolean
-                        help="Keep intermediates files",
-                       )
     parser_mk_tcrptome.add_argument('-t', '--thread',
                         type=int,
                         help="number of trhead (defaul: 1)",
                         default=1,
+                       )
+    parser_mk_tcrptome.add_argument('-k', '--keep',
+                        action="store_true",          # boolean
+                        help="Keep intermediates files",
                        )
     parser.add_argument('-v', '--version',
                         action='version',

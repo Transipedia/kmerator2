@@ -39,7 +39,7 @@ def output(gene, type, info):
             lgth = max(len(item), lgth)
         ### print for ensembl gene
         if type in ['ENSG', 'ENST', 'SYMBOL']:
-            print(info)
+            # print(info)
             if 'display_name' in info: print(f"    {'Symbol Name':<{lgth}} {info['display_name']}")
             print(f"    {'Ensembl ID':<{lgth}} {info['id']}")
             print(f"    {'Type':<{lgth}} {info['object_type']}")
