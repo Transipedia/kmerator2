@@ -35,7 +35,7 @@ TODO
 """
 
 """
-New version:
+New kmerator:
 speed:
     - testing with 5 genes, new version: 13 sec, old version: 63 sec
 ergonomic:
@@ -47,7 +47,7 @@ ergonomic:
 lisibility:
     - kmerator now show missing genes
 installation:
-    - no need julia, it's python, so, to install `pip3 install kmerator`
+    - no need julia, it's python, so, to install `pip3 install kmerator2`
 output:
     - a report formated in markdown stores some information like user, date, command, etc.
     - merged tags and contigs are available (directly in the outpout directory)
