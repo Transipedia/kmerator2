@@ -24,8 +24,8 @@ setuptools.setup(
     ],
     entry_points = {
         'console_scripts': [
-            'kmerator = kmerator.kmerator:main',
-            'ktools = utils.ktools.main',
+            'kmerator2 = kmerator.kmerator:main',
+            'ktools = kmerator.ktools:main',
         ],
     },
     include_package_data = True,
