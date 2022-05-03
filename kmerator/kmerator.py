@@ -569,7 +569,10 @@ class SpecificKmers:
             with open(os.path.join(contigs_outdir, contig_file), 'w') as fh:
                 fh.write("\n".join(fasta_contig_list) + '\n')
 
-        mesg = (f"{gene_name}:{transcript_name} as {level} level ({given_name})")
+        if self.args.selection:
+            mesg = (f"{gene_name}:{transcript_name} as {level} level ({given_name}).")
+        else:
+            mesg = (f"{gene_name} as {level} level.")
         return mesg
 
 
