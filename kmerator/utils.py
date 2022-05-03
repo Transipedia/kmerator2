@@ -26,7 +26,8 @@ def usage():
                                 "extract specific kmers from. For genes, kmerator search specific "
                                 " kmers along the gene. For transcripts, it search specific kmers "
                                 "to the transcript. You can also give a file with yours "
-                                "genes/transcripts. If you want to use your own sequences, you "
+                                "genes/transcripts separated by space, tab or newline. "
+                                "If you want to use your own unannotated sequences, you "
                                 "must give your fasta file with --fasta_file option."
                                 ),
                             nargs='+',
@@ -62,16 +63,6 @@ def usage():
                             "it must be the same transcriptome!)."
                             ),
                         )
-    # ~ parser.add_argument('-l', '--level',
-                        # ~ type=str,
-                        # ~ choices=['gene', 'transcript', 'chimera'],
-                        # ~ help=(
-                            # ~ "use 'gene', 'transcript' or 'chimera' to extract specific kmers at "
-                            # ~ "these different levels. Note that 'chimera' option activate the "
-                            # ~ "'unannotated' option."
-                            # ~ ),
-                        # ~ required=True,
-                        # ~ )
     parser.add_argument('-c', '--specie',  ### replace -a --appris in julia version
                         help=(
                             "indicate a specie referenced in Ensembl, to help, follow the link "

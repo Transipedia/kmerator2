@@ -5,7 +5,7 @@ import setuptools
 from kmerator import info
 
 setuptools.setup(
-    name = 'kmerator',
+    name = 'kmerator2',
     version = info.VERSION,
     author = info.AUTHOR,
     author_email = info.AUTHOR_EMAIL,
