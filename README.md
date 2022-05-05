@@ -35,14 +35,14 @@ Installation from github
 
 ```
 git clone https://github.com/Transipedia/kmerator2.git
-cp kmerator2/kmerator/kmerator.py /usr/local/bin/kmerator2  # or in your $PATH
-cp kmerator2/kmerator/ktools.py /usr/local/bin/ktools       # or in your $PATH
+cp kmerator2/kmerator/kmerator.py /usr/local/bin/kmerator2  # or somewhere in your $PATH
+cp kmerator2/kmerator/ktools.py /usr/local/bin/ktools       # or somewhere in your $PATH
 ```
 
 
 ## Usage
 ```
-kmerator.py [-h] (-s SELECTION [SELECTION ...] | -f FASTA_FILE) -g GENOME -t TRANSCRIPTOME   
+kmerator2 [-h] (-s SELECTION [SELECTION ...] | -f FASTA_FILE) -g GENOME -t TRANSCRIPTOME   
 			-l {gene,transcript,chimera} [-a APPRIS] [-u] [-k KMER_LENGTH] [--stringent]  
 			[--threshold THRESHOLD] [-o OUTPUT] [-c CORES] [--verbose] [-v]
 ```
@@ -83,7 +83,9 @@ optional arguments:
   -j JELLYFISH_TRANSCRIPTOME, --jellyfish-transcriptome JELLYFISH_TRANSCRIPTOME
                         if your transcriptome (-t option) has already been converted by
                         jellyfish as a jf file, this avoids redoing the operation (be
-                        careful,it must be the same transcriptome!).
+                        careful,it must be the same transcriptome!). if not set, kmerator find
+                        for a jellyfish index with the same name (extension .fa -> .jl), and if
+                        not it creates a index in the output directory (-o).
   -c SPECIE, --specie SPECIE
                         indicate a specie referenced in Ensembl, to help, follow the link
                         https://rest.ensembl.org/documentation/info/species. You can use

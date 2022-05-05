@@ -6,10 +6,8 @@ build/
 .pypirc
 
 
-# kmerexplor results
-kmerexplor-results/
-
 # misc
 *.backup
 output*/
+kmerator/dev-*/
 dev-*/

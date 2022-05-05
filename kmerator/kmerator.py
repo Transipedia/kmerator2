@@ -1,56 +1,7 @@
 #!/usr/bin/env python3
 
 """
-From genes, transcripts or sequences, find specific kmers.
-
-TODO
-- [ ] ADD: Handle alternative to jellyfish, like kmc and kmtricks
-- [ ] voir si des noms HUGO ou GENE SYMBOL commencent par ENS ==> sinon problème car il cherchera un ENS ENSEMBL au lieu de GENE SYMBOL (ligne 213 : elif item.startswith('ENS'):)
-- [ ] BUG: Si je lui donne un ENSG, je ne retrouve pas le nom ensuite (car transformé en gene-SYMBOL) --> mettre son nom dans 'transcripts' (ligne 222 : transcripts[transcript] = [symbol, 'gene'])
-- [ ] finaliser une première version pour pypi
-- [ ] requêtes Ensembl threadées
-- [ ] requêtes Ensembl avec un timeout
-- [ ] EVAL: requêtes Ensembl remplacées par le plus long transcript (sous-entendu : y a t'il des genes qui n'ont pas de transcripts canoniques)???
-- [ ] SpecificKmers dans un fichier séparé ???
-- [ ] nettoyage des prints et autres bouts de codes commentés
-- [ ] pouvoir fournir un fichier à --selection
-- [ ] pouvoir fournir un fichier de configuration
-- [ ] le nom de l'option --fasta-file n'est pas terrible
-- [ ] la création des séquences peut être multithreadée (une bonne idée ?)
-- [ ] ajouter une option --keep pour garder les fichiers intermédiaires (et sinon les supprimer) - ou le contraire --del-details
-- [ ] ajouter une option pour aggréger les fichiers de résultats
-- [ ] ajouter dans le Pypi une commande qui renvoie la liste des espèces gérées par Ensembl
-- [ ] faire un paquet DEB (avec pypi2deb ou py2deb)
-- [✔] ajouter dans le Pypi une commande pour générer automatiquement un transcriptome (en fonction de l'espèce ce serait bien)
-- [✔] Ajouter une option --report pour créer un rapport en markdown (date, auteur, commande complète, path, requêtes traitées, requêtes non traitées, etc.)
-- [✔] faire un test pour la souris
-- [✔] kmerator.py : si le jellyfish du transcriptome est au même endroit (et avec le meme nom) que le .fa, le gérer automatiquement.
-- [✔] Vérifier que la casse est gérées
-- [✔] aujourdh'ui, plantage sur Ensembl (ddos sur les dns ?) avec un "ConnectionError" ==> message warning + se rabattre sur les plus longs transcripts
-- [x] BUG du RUNX1 non trouvé dans le transcriptome v99 -> pas vraiment un bug.
-- [✔] supprimer les sous-répertoire '31'
-- [x] BUG: le transcript ENST00000621131 (VPS29) n'a pas été fait ! Même si aucun kmer trouvé, il faudrait créer un fichier vide... Mis quoi mettre dans le merged ? plus besoin car dans le rapport
-- [✔] les genes/transcripts non traités devraient s'afficher à la fin
-- [✔] {transcript: (gene, level)} n'est pas très clair  ->  {transcript: (gene, level, provided_by)} ou provided_by est 'Ensembl' ou 'longest'
-"""
-
-"""
-New kmerator:
-speed:
-    - testing with 5 genes, new version: 13 sec, old version: 63 sec
-ergonomic:
-    - no need to specify --level, you can mix symbol name, ENST name and ENSG.
-    - '--selection' option accept both list of genes or file (with the list of genes)
-    - if not specified, the jellyfish trancriptome is automatically searched in:
-        - the same directory of the fasta transcriptome (with same name but '.jf' extension)
-        - the output directory of the jellyfish transcriptome (useful when re-played kmerator)
-lisibility:
-    - kmerator now show missing genes
-installation:
-    - no need julia, it's python, so, to install `pip3 install kmerator2`
-output:
-    - a report formated in markdown stores some information like user, date, command, etc.
-    - merged tags and contigs are available (directly in the outpout directory)
+Decomposition of transcript or gene sequences and extraction of their specific k-mers
 """
 
 
@@ -362,9 +313,6 @@ class SpecificKmers:
             given_name = transcript[1]['given']      # TP53 (gen/transcript given by user)
             seq_file = f"{gene_name}.{transcript_name}.fa"
             ### Define all variants for a gene
-            # ~ for k,a in self.transcriptome_dict.items():
-                # ~ print(k,a)
-                # ~ break
             variants_dict = { k:v for k,v in self.transcriptome_dict.items() if k.startswith(gene_name) }
             nb_variants = len(variants_dict)
             # ~ print(f"{gene_name}: {variants_dict.keys()}")
@@ -675,8 +623,6 @@ def show_info(report):
             print(f"  - {mesg}")
 
     print(f"{Color.END}")
-
-    print(f"{Color.CYAN}\n     🪚  Penser à mettre gene-info.py dans bio2m-dev-laboratory.{Color.END}")
 
 
 def markdown_report(args, report):
