@@ -33,7 +33,6 @@ def usage():
                             nargs='+',
                             )
     query_type.add_argument('-f', '--fasta-file',
-                            # ~ type=argparse.FileType('r'),
                             help=(
                                 "Use this option when yours sequences are unannonated or provided "
                                 "by a annotation file external from Ensembl. Otherwise, "
@@ -41,14 +40,12 @@ def usage():
                                 ),
                             )
     parser.add_argument('-g', '--genome',
-                        # ~ type=argparse.FileType('r'),
                         help=(
                             "genome fasta file or jellyfish index (.jf) to use for k-mers requests."
                             ),
                         required=True,
                         )
     parser.add_argument('-t', '--transcriptome',
-                        # ~ type=argparse.FileType('r'),
                         help=(
                             "transcriptome fasta file (ENSEMBL fasta format ONLY) to use for "
                             "k-mers request and transcriptional variants informations."
@@ -56,7 +53,6 @@ def usage():
                         required=True,
                         )
     parser.add_argument('-j', '--jellyfish-transcriptome',
-                        # ~ type=argparse.FileType('r'),
                         help=(
                             "if your transcriptome (-t option) has already been converted by "
                             "jellyfish as a jf file, this avoids redoing the operation (be careful,"
@@ -143,11 +139,6 @@ def checkup_args(args):
     ### check if transcriptome is present
     if args.transcriptome and not os.path.isfile(args.transcriptome):
         sys.exit(f"{Color.RED}Error: {args.transcriptome!r} not found{Color.END}.")
-    ### Check genome fasta/jellyfish file extension
-    ### Check transcriptome fasta file extension
-    # ~ if args.transcriptome.name.split('.')[-1] not in ("fa", "fasta"):
-        # ~ sys.exit(f" {Color.RED}Error: {os.path.basename(args.transcriptome.name)}" \
-                # ~ f" does not appears to be a fasta file.{Color.END}")
     ### Check Gene Select option
     if args.selection:
         for gene in args.selection:
@@ -155,19 +146,13 @@ def checkup_args(args):
                 sys.exit(f"{Color.RED}ENSEMBL annotations with version (point) like "
                         f"ENSTXXXXXXXX.1 is forbidden, just remove the '.1'.{Color.END}"
                         )
-    ### Check if transcriptome is at ensembl format
-    # ~ if not is_transcriptome_ensembl_file(args.transcriptome.readline()):
-        # ~ sys.exit(f"{Color.RED}Error: {os.path.basename(args.transcriptome.name)} not in ENSEMBL fasta format, "
-                # ~ f"use ENSEMBL transcriptome fasta file.{Color.END}")
-    ## CANONICAL option works only with the gene annotated level
-    # ~ if args.specie and (args.level != "gene" or args.unannotated):
-        # ~ sys.exit(f"{Color.RED}Error: CANONICAL option works only with the gene annotated level{Color.END}")
+        ### Define genes/transcripts provided when they are in a file
+        if len(args.selection) == 1 and os.path.isfile(args.selection[0]):
+            with open(args.selection[0]) as fh:
+                args.selection = fh.read().split()
     ## --chimera level works only with --fasta-file option
     if args.chimera and not args.fasta_file:
         sys.exit(f"{Color.RED}Error: '--chimera' needs '--fasta-file' option.{Color.END}")
-    ### unanotated option want fasta_file option
-    # ~ if args.unannotated and not args.fasta_file:
-        # ~ sys.exit(f"{Color.RED}Error: with unannotated option, 'fasta-file' option is required.{Color.END}")
     ### if jellyfish of transcriptome is provided, check it
     if args.jellyfish_transcriptome and not args.jellyfish_transcriptome.split('.')[-1] == 'jf':
         sys.exit(f"{Color.RED}Error: {os.path.basename(args.jellyfish_transcriptome)!r} does not seem to be in jellyfish format.")

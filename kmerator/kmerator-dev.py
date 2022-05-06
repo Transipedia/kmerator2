@@ -13,14 +13,12 @@ import getpass
 from datetime import datetime
 
 import info
+import sequences
+from sequences import Sequences
 from utils import usage, checkup_args, Color
-from fasta import fasta2dict
 from kmerize import SpecificKmers
 from ensembl import Ensembl
 
-
-
-BASE_URL = "https://rest.ensembl.org"
 
 
 def main():
@@ -44,17 +42,21 @@ def main():
         transcriptome_dict = ebl_fasta2dict(args.transcriptome)
         ### get canonical transcripts using Ensembl API
         print(f" 🧬 Fetch some information from Ensembl API.")
-        ensembl = Ensembl(args, report, transcripts)
+        ensembl = Ensembl(args, report)
         best_transcripts = ensembl.get_ENST()
-        # ~ best_transcripts = get_ensembl_transcripts(args, report)
-        # ~ print(best_transcripts)
         ### Build sequence using provided transcriptome
         print(f" 🧬 Build sequences.")
-        build_sequences(args, report, best_transcripts, transcriptome_dict)
+        # ~ build_sequences(args, report, best_transcripts, transcriptome_dict)
+        # ~ sequences.build(args, report, best_transcripts, transcriptome_dict)
+        seq = Sequences(args, report, best_transcripts, transcriptome_dict)
+        seq.build()
+
     ### when --fasta-file option is set
     else:
         print(f" 🧬 Build sequences.")
-        build_sequences(args, report, unannotated_transcripts)
+        # ~ sequences.build(args, report, unannotated_transcripts)
+        seq = Sequences(args, report, unannotated_transcripts)
+        seq.build()
 
     ### get specific kmer with multithreading
     print(f" 🧬 Extract specific kmers, please wait..")
@@ -71,131 +73,6 @@ def main():
 
     ### ending
     gracefully_exit(args)
-
-
-
-def build_sequences(args, report, transcripts, transcriptome_dict=None):
-    ''''
-    create files for each transcript
-    Be careful:
-        transcripts == best_transcripts  when genes/transcripts are known
-        transcripts == unannotated_transcripts  for unannotated sequences
-    '''
-    output_seq_dir = os.path.join(args.output, 'sequences')
-    removed_transcripts = []
-    ### Whith --selection option
-    if args.selection:
-        ### Abort if no transcripts found
-        if not transcripts:
-            sys.exit(f"{Color.RED}Error: no sequence found for {args.selection}")
-        ### create output directory structure
-        os.makedirs(output_seq_dir, exist_ok=True)
-        ### Get the sequences and create files for each of them
-        for transcript,values in transcripts.items():
-            desc = f"{values['symbol']}:{transcript}"
-            if desc in transcriptome_dict:
-                seq = transcriptome_dict[desc]
-                if len(seq) < args.kmer_length:
-                    report['warming'].append(f"{desc!r} sequence length < {args.kmer_length} => ignored")
-                    continue
-                ### create fasta files
-                outfile = f"{values['symbol'].replace('.','_')}.{transcript}.fa"[:255].replace(' ', '_').replace('/', '@SLASH@')
-                outfile = f"{args.output}/sequences/{outfile}"
-                with open(outfile, 'w') as fh:
-                    fh.write(f">{values['symbol']}:{transcript}\n{seq}")
-            ### When transcript is not found
-            else:
-                report['aborted'].append(f"{transcript} not found in provided transcriptome (gene: {values['symbol']})")
-                removed_transcripts.append(transcript)
-            '''
-            ### As alternative, fetch sequences with Ensembl API
-            ext_ebl = f'/sequence/id/{transcript}?type=cdna;species={args.specie}'
-            r = requests.get(BASE_URL+ext_ebl, headers={ "Content-Type": "text/plain"})
-            seq = r.text
-            '''
-        for tr in removed_transcripts:
-            transcripts.pop(tr)
-    ### Whith --fasta-file option
-    else:
-        ### read fasta file
-        if args.verbose: print(f"{Color.YELLOW}{'-'*12}\n\nBuild sequences without transcriptome.\n{Color.END}")
-        fastafile_dict = fasta2dict(args.fasta_file)
-        ### Abort if dict empy
-        if not fastafile_dict:
-            sys.exit(f"{Color.RED}Error: no sequence found for {args.fasta_file}")
-        ### create output directory structure
-        os.makedirs(output_seq_dir, exist_ok=True)
-        for desc,seq in fastafile_dict.items():
-            outfile = f"{desc.replace(' ', '_').replace('/', '@SLASH@')}.fa"[:255]
-            if len(seq) < args.kmer_length:
-                report['aborted'].append(f"{desc!r} sequence length < {args.kmer_length} => ignored")
-                continue
-            transcripts.append(desc)
-            with open(os.path.join(output_seq_dir, outfile), 'w') as fh:
-                fh.write(f">{desc[:79]}\n{seq}")
-
-
-def get_ensembl_transcripts(args, report):
-    ''''
-    Works with --selection option,
-    - get canonical transcript and symbol name if ENSG is provided
-    - get symbol name if ENST is provided return dict as format {ENST: SYMBOL}
-    - get canonical transcript if symbol name is provided
-    return dict as format {ENST: SYMBOL}
-    '''
-    ### Define genes/transcripts provided when they are in a file
-    if len(args.selection) == 1 and os.path.isfile(args.selection[0]):
-        with open(args.selection[0]) as fh:
-            args.selection = fh.read().split()
-    ### get transcript from Ensembl API
-    transcripts = {}                                # the dict to return
-    ebl_motifs = ['ENSG', 'ENST']                   # Accepted Ensembl motifs
-    ext_symbol = f"/xrefs/symbol/{args.specie}/"    # extension to get ENSG with SYMBOL
-    ext_ebl = "/lookup/id/"                         # extension to get info with ENSG/ENST
-    headers={ "Content-Type" : "application/json"}  # header for the query
-    for item in args.selection:
-        ### When ENST is provided, get symbol
-        if item.startswith('ENST'):
-            url = BASE_URL+ext_ebl+item+"?"
-            r = ebl_request(report, item, url, headers=headers)
-            if not r: continue
-            if  not 'display_name' in r:
-                print(f"display name of {item!r} not found from Ensembl API.")
-                continue
-            transcript = item.split('.')[0]
-            symbol = r['display_name'].split('-')[0]
-            transcripts[transcript] = {'symbol':symbol, 'level': 'transcript', 'given': item}
-        ### When ENSEMBL GENE NAME is provided, get canonical transcript
-        elif item.startswith('ENS'):
-            url = BASE_URL+ext_ebl+item+"?"
-            r = ebl_request(report, item, url, headers=headers)
-            if not r: continue
-            transcript = r['canonical_transcript'].split('.')[0]
-            if 'display_name' in r:
-                symbol = r['display_name']
-            else:
-                symbol = r['id']
-            transcripts[transcript] = {'symbol':symbol, 'level': 'gene', 'given': item}
-        ### In other cases, item is considered as NAME_SYMBOL
-        else:
-            url = BASE_URL+ext_symbol+item+"?"
-            r = ebl_request(report, item, url, headers=headers)
-            if not r:
-                continue
-            candidates_symbol = []
-            for a in r:     # r is a dict list
-                if a['id'].startswith('ENS'):
-                    ensg = (a['id'])
-                    url = BASE_URL+ext_ebl+ensg+"?"
-                    r = ebl_request(report, item, url, headers=headers)
-                    if not r['seq_region_name'].startswith('CHR_'):
-                        transcript = r['canonical_transcript'].split('.')[0]
-                        symbol = r['display_name']
-                        transcripts[transcript] = {'symbol':symbol, 'level': 'gene', 'given': item}
-                        candidates_symbol.append(symbol)
-            if len(candidates_symbol) > 1:
-                report['multiple'].append({item: candidates_symbol})
-    return transcripts
 
 
 def ebl_request(report, item, url, headers):
@@ -264,18 +141,28 @@ def merged_results(args):
 def show_info(report):
     ### show some final info in the prompt
     print(f"{Color.CYAN}\n Done ({len(report['done'])}):")
-    for mesg in report['done']:
+    for i,mesg in enumerate(report['done']):
+        if i == 15:
+            print("  - ... (more responses)")
+            break
         print(f"  - {mesg}")
 
+
     if report['multiple']:
-        print(f"{Color.BLUE}\n Multiple responses ({len(report['multiple'])}):")
-        for mesg in report['multiple']:
+        print(f"{Color.BLUE}\n Multiple responses from Ensembl API ({len(report['multiple'])}):")
+        for i,mesg in enumerate(report['multiple']):
+            if i == 15:
+                print("  - ... (more responses)")
+                break
             for k,v in mesg.items():
                 print(f"  - {k}: {' '.join(v)}")
 
     if report['aborted']:
         print(f"{Color.PURPLE}\n Aborted ({len(report['aborted'])}):")
-        for mesg in report['aborted']:
+        for i,mesg in enumerate(report['aborted']):
+            if i == 15:
+                print("  - ... (more responses)")
+                break
             print(f"  - {mesg}")
 
     print(f"{Color.END}")
@@ -296,10 +183,10 @@ def markdown_report(args, report):
             for mesg in report['done']:
                 fh.write(f"- {mesg}\n")
         if report['multiple']:
-            fh.write(f"\n**Multiple Genes returned for one given ({len(report['multiple'])})**\n\n")
+            fh.write(f"\n**Multiple Genes returned for one given by Ensembl API ({len(report['multiple'])})**\n\n")
             for mesg in report['multiple']:
                 for k,v in mesg.items():
-                    fh.write(f"  - {k}: {' '.join(v)}")
+                    fh.write(f"- {k}: {' '.join(v)}\n")
         if report['aborted']:
             fh.write(f"\n\n**Genes/transcript missing ({len(report['aborted'])})**\n\n")
             for mesg in report['aborted']:

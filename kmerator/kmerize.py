@@ -25,7 +25,6 @@ class SpecificKmers:
         ### Sequences files to analyse
         self.seq_files_dir = os.path.join(self.args.output, 'sequences')
         ### launch workers
-
         transcripts = best_transcripts.items() if args.selection else unannotated_transcripts
         with multiprocessing.Pool(processes=self.args.procs) as pool:
             mesg = pool.map(self.worker, transcripts)

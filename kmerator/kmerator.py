@@ -157,7 +157,7 @@ def get_ensembl_transcripts(args, report):
             r = ebl_request(report, item, url, headers=headers)
             if not r: continue
             if  not 'display_name' in r:
-                print(f"display name of {item!r} not found from Ensembl API.")
+                print(f"display name of {item!r} not found by Ensembl API.")
                 continue
             transcript = item.split('.')[0]
             symbol = r['display_name'].split('-')[0]
@@ -187,7 +187,7 @@ def get_ensembl_transcripts(args, report):
                     r = ebl_request(report, item, url, headers=headers)
                     if not r['seq_region_name'].startswith('CHR_'):
                         transcript = r['canonical_transcript'].split('.')[0]
-                        symbol = r['display_name']
+                        symbol = r['display_name'] if 'display_name' in r else item.upper()
                         transcripts[transcript] = {'symbol':symbol, 'level': 'gene', 'given': item}
                         candidates_symbol.append(symbol)
             if len(candidates_symbol) > 1:
@@ -202,7 +202,7 @@ def ebl_request(report, item, url, headers):
         sys.exit(f"{Color.RED}\n Error: Ensembl is not accessible or not responding.{Color.END}")
     r = r.json()
     if not r:
-        report['aborted'].append(f"{item} not found from Ensembl API.")
+        report['aborted'].append(f"{item} not found by Ensembl API.")
         return None
     if 'error' in r:
         report['aborted'].append(f"{r[error]}.")

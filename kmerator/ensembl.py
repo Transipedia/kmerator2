@@ -12,11 +12,10 @@ def main():
     """ Function doc """
     ### some variables
     report = {'aborted': [], 'done': [], 'multiple': []}
-    transcripts = {}
+
     ### get transcript from Ensembl API
     print("GET ENSEMBL INFO")
-
-    ensembl = Ensembl(args, report, transcripts)
+    ensembl = Ensembl(args, report)
     transcripts = ensembl.get_ENST()
 
     print(f"Selection ({len(args.selection)})")
@@ -38,17 +37,17 @@ class Ensembl:
     url = "https://rest.ensembl.org"
     nb_threads = 15                     # Because Ensembl limits requests to 15 per second'
 
-    def __init__(self, args, report, transcripts):
+    def __init__(self, args, report):
         """ Class initialiser """
         self.report = report
         self.args = args
-        self.transcripts = transcripts                         # the dict to return
         self.headers = {"Content-Type" : "application/json"}   # header for the query
 
 
     def get_ENST(self):
         """ Function doc """
-        urls = []          # list of dicts where keys are 'item', 'level' and 'url'
+        transcripts = {}                # the dict to return
+        urls = []                       # list of dicts where keys are 'item', 'level' and 'url'
         symbols_urls = []
 
         ### Define Ensembl URLs for each given item
@@ -78,7 +77,7 @@ class Ensembl:
         ### Define symbol urls for urls list
         for symbol in ensg_symbol_list:
             if len(symbol['response']) == 0:
-                self.report['aborted'].append(f"{symbol['item']!r} not found (Ensembl API).")
+                self.report['aborted'].append(f"{symbol['item']!r} not found by Ensembl API.")
                 continue
             for ensg in symbol['response']:
                 item = symbol['item']
@@ -97,7 +96,7 @@ class Ensembl:
             level = dic['level']
             item = dic['item']
             if  not 'display_name' in response:
-                self.report['aborted'].append(f"{item!r} not found (Ensembl API).")
+                # ~ self.report['aborted'].append(f"{item!r} not found by Ensembl API.")
                 continue
             if response['seq_region_name'].startswith('CHR_'):
                 if not dic['item'] in find_xtime:  # to avoid repetition when multiples ENST are found for once gene
@@ -107,8 +106,8 @@ class Ensembl:
                 transcript = response['id'].upper()
             else:
                 transcript = response['canonical_transcript'].split('.')[0]
-            symbol = response['display_name'].split('-')[0]
-            self.transcripts[transcript] = {'symbol':symbol, 'level': level, 'given': item}
+            symbol = response['display_name'] if 'display_name' in response else response['id']
+            transcripts[transcript] = {'symbol':symbol, 'level': level, 'given': item}
             if level == 'gene':
                 find_xtime[item].append(response['display_name'])
 
@@ -117,7 +116,7 @@ class Ensembl:
             if len(names) > 1:
                 self.report['multiple'].append({item: names})
 
-        return self.transcripts
+        return transcripts
 
 
     def ebl_request(self, query):
