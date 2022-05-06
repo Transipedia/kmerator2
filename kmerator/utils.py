@@ -103,7 +103,7 @@ def usage():
                         help="run n processes simultaneously (default: 1)",
                         default=1,
                         )
-    parser.add_argument('--verbose',
+    parser.add_argument('-d', '--debug',
                         action='store_true',
                         help="if you want some details while Kmerator is running.",
                         )

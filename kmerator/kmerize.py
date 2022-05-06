@@ -5,6 +5,7 @@ import subprocess
 import multiprocessing
 
 from fasta import fasta2dict
+from utils import Color
 
 
 class SpecificKmers:
@@ -35,6 +36,7 @@ class SpecificKmers:
         '''
         transcript is a dict when '--selection' is set, else it is a list
         '''
+        # ~ if self.args.debug: print(f"{Color.YELLOW}Start jellyfish count on {transcript}.{Color.END}")
         ### Define some variables: gene_name, transcript_name, variants_dic and output file names
         fasta_kmer_list = []                # specific kmers list
         fasta_contig_list = []              # specific contigs list
@@ -97,7 +99,7 @@ class SpecificKmers:
         i = 0       # kmer number
         j = 1       # contig number
         total_kmers = len(kmercounts_transcriptome_dict)
-        if self.args.verbose: print(f"[{seq_file}]: Total kmers in kmercounts_transcriptome_dict= {total_kmers}")
+        if self.args.debug: print(f"{Color.YELLOW}kmer counts found by Jellyfish for {seq_file}: {total_kmers}{Color.END}")
 
         ## creating a new dictionary with kmers and their first position in our query sequence
         kmer_starts = {}
@@ -108,7 +110,6 @@ class SpecificKmers:
             kmer_placed += 1
             kmer_starts[mer] = next(iter(sequence_fasta.values())).index(mer)
 
-        if self.args.verbose: print(f"[{seq_file}]: Total kmers found in sequence_fasta = {len(kmer_starts)}")
         ### rearrange kmer_starts as list of sorted tuple like (position, kmer)
         kmer_starts_sorted = sorted(list(zip(kmer_starts.values(), kmer_starts.keys())))  # array sorted by kmer position
         # ~ position_kmer_prev = first(kmer_starts_sorted[1])
@@ -268,7 +269,7 @@ class SpecificKmers:
         ### building kmercounts dictionary from jellyfish query on the genome
 
         ### Compute jellyfish on TRANSCRIPTOME
-        if args.verbose: print(f"{'-'*9}\n{Color.YELLOW}Compute Jellyfish on the transcriptome.{Color.END}")
+        if args.debug: print(f"{'-'*9}\n{Color.YELLOW}Compute Jellyfish on the transcriptome.{Color.END}")
         root_path = '.'.join(args.transcriptome.split('.')[:-1])
         root_basename = os.path.basename(root_path)
         jelly_candidate = f"{root_path}.jf"
@@ -302,7 +303,7 @@ class SpecificKmers:
             jf_genome = '.'.join(os.path.basename(args.genome).split('.')[:-1]) + '.jf'
             args.jellyfish_genome = os.path.join(jf_dir, jf_genome)
             if os.path.exists(args.jellyfish_genome):
-                if args.verbose:
+                if args.debug:
                     print(f"{Color.YELLOW}{args.jellyfish_genome} already exists, "
                     f"keep it (manually remove to update it).{Color.END}")
             else:
@@ -316,10 +317,10 @@ class SpecificKmers:
                             f"{cmd}{Color.END}")
         ### When jellyfish genome already exists
         else:
-            if args.verbose: print(f"{Color.YELLOW}Jellyfish genome index already provided.{Color.END}")
+            if args.debug: print(f"{Color.YELLOW}Jellyfish genome index already provided.{Color.END}")
             args.jellyfish_genome = genome
 
         ### Ending
-        if args.verbose:
-            print(f"{Color.YELLOW}Transcriptome kmer index output: {jf_transcriptome_dest}\n"
+        if args.debug:
+            print(f"{Color.YELLOW}Transcriptome kmer index output: {args.jellyfish_transcriptome}\n"
                   f"Jellyfish done.{Color.END}")

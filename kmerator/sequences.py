@@ -46,7 +46,7 @@ class Sequences:
         ### With --fasta-file option
         else:
             ### read fasta file
-            if self.args.verbose: print(f"{Color.YELLOW}{'-'*12}\n\nBuild sequences without transcriptome.\n{Color.END}")
+            if self.args.debug: print(f"{Color.YELLOW}{'-'*12}\n\nBuild sequences without transcriptome.\n{Color.END}")
             fastafile_dict = fasta2dict(self.args.fasta_file)
             ### Abort if dict empy
             if not fastafile_dict:
