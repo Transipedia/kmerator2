@@ -50,12 +50,17 @@ kmerator2 [-h] (-s SELECTION [SELECTION ...] | -f FASTA_FILE) -g GENOME -t TRANS
 
 ## How use kmerator2
 
-There is 2 principals cases:
+There are two main cases:
 
 - you find for specific k-mers for annotated genes or transcripts : use the `--selection` option, followed by:
 	- the list of gene and/or transcripts
 	- or a file with the list of genes/transcripts
 - you find for specific k-mers of unannotated sequences : use the `--fasta-file` option, followed by a fasta file containing yours requests. In case of you focuses on chimeras, add the `--chimera` option
+
+### Differences between genes and transcripts
+
+- When you find for a gene (symbol or Ensembl name), kmerator fetch sequence of its canonical transcript, extracts kmers and keep those that found only in the gene.
+- When you find for a transcript, kmerator only keeps the kmer found in the transcript, and only in that transcript. If isoforms completely cover the transcript, no kmer will be kept.
 
 ## arguments
 
@@ -105,7 +110,8 @@ optional arguments:
                         output directory (default: 'output')
   -p PROCS, --procs PROCS
                         run n processes simultaneously (default: 1)
-  --verbose             if you want some details while Kmerator is running.
+  -d, --debug           if you want some details while Kmerator is running.
+  --keep                keep intermediate files.
   -v, --version         show program's version number and exit
 ```
 
