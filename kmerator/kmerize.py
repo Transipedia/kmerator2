@@ -28,8 +28,9 @@ class SpecificKmers:
         ### launch workers
         transcripts = best_transcripts.items() if args.selection else unannotated_transcripts
         with multiprocessing.Pool(processes=self.args.procs) as pool:
-            mesg = pool.map(self.worker, transcripts)
-            report['done'] += mesg
+            messages = pool.map(self.worker, transcripts)
+        for type,mesg in messages:
+            report[type].append(mesg)
 
 
     def worker(self, transcript):
@@ -45,12 +46,11 @@ class SpecificKmers:
             transcript_name = transcript[0]          # ENST00000001
             gene_name = transcript[1]['symbol']      # tp53
             level = transcript[1]['level']           # 'gene' or 'transcript'
-            given_name = transcript[1]['given']      # TP53 (gen/transcript given by user)
+            given_name = transcript[1]['given']      # TP53 (gene/transcript given by user)
             seq_file = f"{gene_name}.{transcript_name}.fa"
             ### Define all variants for a gene
             variants_dict = { k:v for k,v in self.transcriptome_dict.items() if k.startswith(gene_name) }
             nb_variants = len(variants_dict)
-            # ~ print(f"{gene_name}: {variants_dict.keys()}")
             tag_file = f"{gene_name}-{transcript_name}-{level}-specific_kmers.fa"
             contig_file = f"{gene_name}-{transcript_name}-{level}-specific_contigs.fa"
         ## When '--chimera' option is set
@@ -194,7 +194,6 @@ class SpecificKmers:
                     ### kmers case
                     i += 1
                     fasta_kmer_list.append(f">{gene_name}-{transcript_name}.kmer{i}\n{mer}")
-                    # ~ print(f">{gene_name}-{transcript_name}.kmer{i}\n{mer}")                     # TO DELETE
                     ### contigs case
                     if i == 1:
                         contig_seq = mer
@@ -204,7 +203,6 @@ class SpecificKmers:
                         position_kmer_prev = position_kmer
                     else:
                         fasta_contig_list.append(f">{gene_name}.contig{j}\n{contig_seq}")
-                        # ~ print(f">{gene_name}.contig{j}\n{contig_seq}")                              # TO DELETE
                         j += 1
                         contig_seq = mer
                         position_kmer_prev = position_kmer
@@ -244,6 +242,9 @@ class SpecificKmers:
             os.makedirs(tags_outdir, exist_ok=True)
             with open(os.path.join(tags_outdir, tag_file), 'w') as fh:
                 fh.write("\n".join(fasta_kmer_list) + '\n')
+        else:
+            mesg = (f"Not specific kmers found for {given_name!r}.")
+            return ('aborted', mesg)
         ## write contig files
         if fasta_contig_list:
             contigs_outdir = os.path.join(self.args.output, 'contigs')
@@ -255,7 +256,7 @@ class SpecificKmers:
             mesg = (f"{gene_name}:{transcript_name} as {level} level ({given_name}).")
         else:
             mesg = (f"{gene_name} as {level} level.")
-        return mesg
+        return ('done', mesg)
 
 
     ### Jellyfish on genome and transcriptome
@@ -263,7 +264,7 @@ class SpecificKmers:
         args = self.args
         genome = args.genome
         ### To create jellyfish PATH DIR
-        jf_dir = f"{args.output}/jellyfish_indexes"
+        index_dir = f"{args.output}/indexes"
         mk_jfdir = lambda x: os.makedirs(x, exist_ok=True)
 
         ### building kmercounts dictionary from jellyfish query on the genome
@@ -273,7 +274,7 @@ class SpecificKmers:
         root_path = '.'.join(args.transcriptome.split('.')[:-1])
         root_basename = os.path.basename(root_path)
         jelly_candidate = f"{root_path}.jf"
-        jelly_dest = f"{jf_dir}/{root_basename}.jf"
+        jelly_dest = f"{index_dir}/{root_basename}.jf"
         ### check for existing jellyfish transcriptome
         if not args.jellyfish_transcriptome:
             ### at the same location of fasta transcriptome
@@ -285,9 +286,9 @@ class SpecificKmers:
         ### do jellyfish on transcriptome fasta file
         if not args.jellyfish_transcriptome:
             tr_root_file = '.'.join(os.path.basename(args.transcriptome).split('.')[:-1])
-            args.jellyfish_transcriptome = f"{jf_dir}/{tr_root_file}.jf"
+            args.jellyfish_transcriptome = f"{index_dir}/{tr_root_file}.jf"
             print(" 🧬 Compute Jellyfish on the transcriptome, please wait...")
-            mk_jfdir(jf_dir)
+            mk_jfdir(index_dir)
             cmd = (f"jellyfish count -m {args.kmer_length} -s 1000 -t {args.procs}"
                    f" -o {args.jellyfish_transcriptome} {args.transcriptome}")
             try:
@@ -299,9 +300,9 @@ class SpecificKmers:
         ### Compute jellyfish on GENOME if genome is fasta file
         ext = args.genome.split('.')[-1]
         if ext == "fa" or ext == "fasta":
-            mk_jfdir(jf_dir)
-            jf_genome = '.'.join(os.path.basename(args.genome).split('.')[:-1]) + '.jf'
-            args.jellyfish_genome = os.path.join(jf_dir, jf_genome)
+            mk_jfdir(index_dir)
+            indexed_genome = '.'.join(os.path.basename(args.genome).split('.')[:-1]) + '.jf'
+            args.jellyfish_genome = os.path.join(index_dir, indexed_genome)
             if os.path.exists(args.jellyfish_genome):
                 if args.debug:
                     print(f"{Color.YELLOW}{args.jellyfish_genome} already exists, "

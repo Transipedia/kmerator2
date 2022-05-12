@@ -11,6 +11,8 @@ import requests
 import shutil
 import getpass
 from datetime import datetime
+import signal
+from functools import partial
 
 import info
 import sequences
@@ -25,6 +27,11 @@ def main():
     ### Handle arguments
     args = usage()
     if args.debug: print(f"{'-'*9}\n{Color.YELLOW}Args: {args}{Color.END}")
+
+    ### Handle control C
+    global sigint_handler
+    sigint_handler = partial(sigint_handler, args=args)
+    signal.signal(signal.SIGINT, sigint_handler)
 
     ### check options
     checkup_args(args)
@@ -72,7 +79,7 @@ def main():
     markdown_report(args, report)
 
     ### ending
-    gracefully_exit(args)
+    exit_gracefully(args)
 
 
 def ebl_request(report, item, url, headers):
@@ -193,8 +200,17 @@ def markdown_report(args, report):
                 fh.write(f"- {mesg}\n")
 
 
-def gracefully_exit(args):
-    pass
+def sigint_handler(signal, frame, args):
+    exit_gracefully(args)
+
+
+def exit_gracefully(args):
+    if not args.keep:
+        shutil.rmtree(os.path.join(args.output,'tags'), ignore_errors=True)
+        shutil.rmtree(os.path.join(args.output,'contigs'), ignore_errors=True)
+        shutil.rmtree(os.path.join(args.output,'indexes'), ignore_errors=True)
+        shutil.rmtree(os.path.join(args.output,'sequences'), ignore_errors=True)
+    sys.exit(0)
 
 
 """ _find_longest_variant

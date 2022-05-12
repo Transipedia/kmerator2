@@ -60,7 +60,9 @@ class Sequences:
 
 
     def mk_annot_seq(self, transcript):
-        """ Function doc """
+        """
+        find canonical transcript in transcriptome and write his sequence in file.
+        """
         desc = f"{transcript['symbol']}:{transcript['enst']}"
 
         if desc in self.transcriptome_dict:

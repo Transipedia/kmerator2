@@ -106,7 +106,7 @@ class Ensembl:
                 transcript = response['id'].upper()
             else:
                 transcript = response['canonical_transcript'].split('.')[0]
-            symbol = response['display_name'] if 'display_name' in response else response['id']
+            symbol = response['display_name'].split('-')[0] if 'display_name' in response else response['id']
             transcripts[transcript] = {'symbol':symbol, 'level': level, 'given': item}
             if level == 'gene':
                 find_xtime[item].append(response['display_name'])

@@ -107,6 +107,10 @@ def usage():
                         action='store_true',
                         help="if you want some details while Kmerator is running.",
                         )
+    parser.add_argument('--keep',
+                        action='store_true',
+                        help="keep intermediate files.",
+                        )
     parser.add_argument('-v', '--version',
                         action='version',
                         version=f'{parser.prog} v{info.VERSION}',
