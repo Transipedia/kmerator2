@@ -111,7 +111,8 @@ optional arguments:
   -p PROCS, --procs PROCS
                         run n processes simultaneously (default: 1)
   -d, --debug           if you want some details while Kmerator is running.
-  --keep                keep intermediate files.
+  --keep                keep intermediate files (sequences, indexes, separate tags and contigs 
+                        files).
   -v, --version         show program's version number and exit
 ```
 
@@ -122,7 +123,7 @@ optional arguments:
 
 ## ktools, a companion tool for kmerator
 
-ktools can help you with some kmeratir related tasks. For example, build the transcriptome could be tricky and repetitive (updated quaterly).
+ktools can help you with some kmerator related tasks. For example, build the transcriptome could be tricky and repetitive (updated quaterly).
 
 ```
 usage: ktools [-h] [-v] {mk-transcripts} ...

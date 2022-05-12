@@ -243,7 +243,10 @@ class SpecificKmers:
             with open(os.path.join(tags_outdir, tag_file), 'w') as fh:
                 fh.write("\n".join(fasta_kmer_list) + '\n')
         else:
-            mesg = (f"Not specific kmers found for {given_name!r}.")
+            if self.args.selection:
+                mesg = (f"{given_name}: not specific kmers found.")
+            else:
+                mesg = (f"{transcript}: Not specific kmers found.")
             return ('aborted', mesg)
         ## write contig files
         if fasta_contig_list:

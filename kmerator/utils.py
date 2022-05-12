@@ -109,7 +109,9 @@ def usage():
                         )
     parser.add_argument('--keep',
                         action='store_true',
-                        help="keep intermediate files.",
+                        help=("keep intermediate files (sequences, indexes, separate tags and "
+                            "contigs files)."
+                            ),
                         )
     parser.add_argument('-v', '--version',
                         action='version',
