@@ -94,6 +94,11 @@ def usage():
                             ),
                         default=0,
                         )
+    parser.add_argument('--max-on-transcriptome',
+                        type=float,
+                        help=argparse.SUPPRESS,
+                        default=0,
+                        )
     parser.add_argument('-o', '--output',
                         help="output directory (default: 'output')",
                         default='output',

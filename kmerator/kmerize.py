@@ -120,8 +120,8 @@ class SpecificKmers:
         kmers_analysed = 0
         for tuple in kmer_starts_sorted:
             ### from the kmer/position sorted list, we extract sequence if specific (occurence ==1)
-            mer = tuple[1]              # kmer sequence
-            position_kmer = tuple[0]    # kmer position
+            position_kmer = tuple[0]    # position of kmer
+            mer = tuple[1]              # sequence of kmer
             # ~ startt = time.time()
             kmers_analysed += 1
             per = round(kmers_analysed/total_kmers*100)     # to show percentage done ?
@@ -133,7 +133,7 @@ class SpecificKmers:
                 genome_count = kmercounts_genome_dict[revcomp_mer]
             transcriptome_count = kmercounts_transcriptome_dict[mer]
 
-            ### Case of annotated genes/transcripts
+            ### Case of annotated genes
             if level == 'gene':
                 ## if the kmer is present/unique or does not exist (splicing?) on the genome
                 if genome_count <= 1:
@@ -155,7 +155,10 @@ class SpecificKmers:
                             j = j+1
                             contig_seq = mer
                             position_kmer_prev = position_kmer
-                    elif not self.args.stringent and transcriptome_count == len(variants_containing_this_kmer) and transcriptome_count > nb_variants * self.args.threshold:
+                    elif (not self.args.stringent
+                            and transcriptome_count == len(variants_containing_this_kmer)
+                            and transcriptome_count > nb_variants * self.args.threshold
+                         ):
                         ### kmers case
                         i += 1
                         tmp = len(variants_containing_this_kmer)
@@ -173,8 +176,10 @@ class SpecificKmers:
                             contig_seq = mer
                             position_kmer_prev = position_kmer
 
+            ### Cases of transcripts 1) unannotated, 2) annotated.
             elif level == 'transcript':
-                if self.args.fasta_file and transcriptome_count == 0 and genome_count <= 1:
+                ### Case of unannotated transcripts
+                if self.args.fasta_file and transcriptome_count <= self.args.max_on_transcriptome and genome_count <= 1: # max_on_transcriptome = 0 by default
                     ### kmers case
                     i += 1
                     fasta_kmer_list.append(f">{gene_name}.kmer{i}\n{mer}")
@@ -190,7 +195,7 @@ class SpecificKmers:
                         j += 1
                         contig_seq = mer
                         position_kmer_prev = position_kmer
-
+                ### Case of annotated transcripts
                 elif self.args.selection and transcriptome_count == 1 and genome_count <= 1:
                     ### kmers case
                     i += 1
@@ -208,7 +213,7 @@ class SpecificKmers:
                         contig_seq = mer
                         position_kmer_prev = position_kmer
 
-            ### Case of unannotated sequences
+            ### Case of chimera
             elif level == 'chimera':
                 if transcriptome_count == genome_count == 0:
                     ### kmers case
