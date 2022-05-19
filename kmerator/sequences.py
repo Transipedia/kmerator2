@@ -76,6 +76,9 @@ class Sequences:
             outfile = f"{self.args.output}/sequences/{outfile}"
             with open(outfile, 'w') as fh:
                 fh.write(f">{transcript['symbol']}:{transcript['enst']}\n{seq}")
+            ### check if file is present
+            if not os.path.isfile(outfile):
+                print(f"{Color.RED}Error: unable to create {outfile}.")
         ### When transcript is not found
         else:
             self.report['aborted'].append(f"{transcript['enst']!r} not found in provided transcriptome (gene: {transcript['symbol']})")
@@ -92,3 +95,6 @@ class Sequences:
         self.transcripts.append(entry['desc'])
         with open(outfile, 'w') as fh:
             fh.write(f">{entry['desc'][:79]}\n{entry['seq']}")
+        ### check if file is present
+        if not os.path.isfile(outfile):
+            print(f"{Color.RED}Error: unable to create {outfile}.")

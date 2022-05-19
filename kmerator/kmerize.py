@@ -73,7 +73,7 @@ class SpecificKmers:
         sequence_fasta = fasta2dict(os.path.join(self.args.output,'sequences', seq_file))
 
         ### building kmercounts dictionary using jellyfish query on the genome
-        cmd = (f"jellyfish query -s {os.path.join(self.seq_files_dir,seq_file)} {self.args.jellyfish_genome}")
+        cmd = (f"jellyfish query -s '{os.path.join(self.seq_files_dir,seq_file)}' {self.args.jellyfish_genome}")
         try:
             kmercounts_genome = subprocess.run(cmd, shell=True, check=True, capture_output=True).stdout.decode().rstrip().split('\n')
         except subprocess.CalledProcessError:
@@ -85,7 +85,7 @@ class SpecificKmers:
             kmercounts_genome_dict[seq] = int(count)
 
         ### building kmercounts dictionary using jellyfish query on the transcriptome
-        cmd = (f"jellyfish query -s {os.path.join(self.seq_files_dir,seq_file)} {self.args.jellyfish_transcriptome}")
+        cmd = (f"jellyfish query -s '{os.path.join(self.seq_files_dir,seq_file)}' {self.args.jellyfish_transcriptome}")
         try:
             kmercounts_transcriptome = subprocess.run(cmd, shell=True, check=True, capture_output=True).stdout.decode().rstrip().split('\n')
         except subprocess.CalledProcessError:
