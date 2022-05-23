@@ -59,7 +59,7 @@ def usage():
                             "it must be the same transcriptome!)."
                             ),
                         )
-    parser.add_argument('-c', '--specie',  ### replace -a --appris in julia version
+    parser.add_argument('-S', '--specie',  ### replace -a --appris in julia version
                         help=(
                             "indicate a specie referenced in Ensembl, to help, follow the link "
                             "https://rest.ensembl.org/documentation/info/species. You can use "
@@ -105,7 +105,7 @@ def usage():
                         )
     parser.add_argument('-p', '--procs',
                         type=int,
-                        help="run n processes simultaneously (default: 1)",
+                        help="run n process simultaneously (default: 1)",
                         default=1,
                         )
     parser.add_argument('-d', '--debug',
