@@ -64,6 +64,7 @@ class Sequences:
         find canonical transcript in transcriptome and write his sequence in file.
         """
         desc = f"{transcript['symbol']}:{transcript['enst']}"
+        # ~ print("desc:", desc)
 
         if desc in self.transcriptome_dict:
 

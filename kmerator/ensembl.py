@@ -106,7 +106,22 @@ class Ensembl:
                 transcript = response['id'].upper()
             else:
                 transcript = response['canonical_transcript'].split('.')[0]
-            symbol = response['display_name'].split('-')[0] if 'display_name' in response else response['id']
+            # ~ symbol = response['display_name'].split('-')[0] if 'display_name' in response else response['id']
+            """
+            Very annoying:
+                TSNAX            is good
+                TSNAX-DISC1      is good (not the same than TSNAX)
+                TSNAX-DISC1-208  is not good: 208 is a version number
+            remove items if they are numeric ? Not exactly because
+                MIR3179-4        is good
+                MIR3179-4-201    is not good
+            remove last item if numeric (a real headache).
+            """
+            split_symbol = response['display_name'].split('-') if 'display_name' in response else response['id']
+            symbol_start = split_symbol[:-1]
+            symbol_end = split_symbol[-1]
+            symbol = '-'.join(symbol_start) if symbol_end.isnumeric() and len(symbol_end) == 3 else '-'.join(symbol_start.append(symbol_end))
+
             transcripts[transcript] = {'symbol':symbol, 'level': level, 'given': item}
             if level == 'gene':
                 find_xtime[item].append(response['display_name'])

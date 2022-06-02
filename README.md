@@ -129,8 +129,8 @@ kmerator2 --selection BRCA2  npm1 ENSG00000159216 ENST00000614774 \
 	-o my-output \
 	-p 8
 ```
-**Notes**
-- that genes and transcripts are mixed, but keep in mind that the behaviour is different between the two: in the case of genes, kmerator looks for gene-specific kmers. For transcripts, only kmers specific to the transcript are retained, excluding kmers found in isoforms of the transcript.
+Notes
+- Genes and transcripts are mixed, but keep in mind that the behaviour is different between the two: in the case of genes, kmerator looks for gene-specific kmers. For transcripts, only kmers specific to the transcript are retained, excluding kmers found in isoforms of the transcript.
 - The list of genes/transcript could be in file, separated by spaces, tab or newlines, like `--selection my-gene-file`.
 - kmerator will search the file `/indexes/Homo_sapiens.GRCh38.cdna+ncrna-altchr.jf`, If not exists, it creates it in the output.
 

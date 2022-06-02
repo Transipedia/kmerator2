@@ -116,7 +116,7 @@ def ebl_fasta2dict(fasta_file):
             if line[0] == ">":
                 line = line.split()
                 if len(line) > 6:
-                    gene_name = line[6].split(':')[1]                    # gene symbol
+                    gene_name = line[6].split(':')[1] #.split('-')[0]                    # gene symbol
                 else:
                     gene_name = line[3].split(':')[1].split('.')[0]      # ENSG
                 transcript_name = line[0].split('.')[0].lstrip('>')

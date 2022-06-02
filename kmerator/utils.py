@@ -64,7 +64,7 @@ def usage():
                             "indicate a specie referenced in Ensembl, to help, follow the link "
                             "https://rest.ensembl.org/documentation/info/species. You can use "
                             "the 'name', the 'display_name' or any 'aliases'. For example human, "
-                            "homo_sapiens or homsap are valid."
+                            "homo_sapiens or homsap are valid (default: human)."
                             ),
                         default='human',
                         )
@@ -92,7 +92,7 @@ def usage():
                             "FOR ANNOTATED GENE ONLY: minimum fraction of annotated transcripts, "
                             "for a given gene, containing this kmer to keep it (default: 0)"
                             ),
-                        default=0,
+                        default=1,
                         )
     parser.add_argument('--max-on-transcriptome',
                         type=float,

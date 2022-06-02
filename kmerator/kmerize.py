@@ -157,7 +157,7 @@ class SpecificKmers:
                             position_kmer_prev = position_kmer
                     elif (not self.args.stringent
                             and transcriptome_count == len(variants_containing_this_kmer)
-                            and transcriptome_count > nb_variants * self.args.threshold
+                            and transcriptome_count >= nb_variants * self.args.threshold
                          ):
                         ### kmers case
                         i += 1
