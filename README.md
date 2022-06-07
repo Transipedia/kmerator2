@@ -102,9 +102,6 @@ optional arguments:
                         specific k-mers present in ALL known transcripts for your gene. If
                         false, a k-mer is considered as gene-specific if present in at least
                         one isoform of your gene of interest.
-  --threshold THRESHOLD
-                        FOR ANNOTATED GENE ONLY: minimum fraction of annotated transcripts,
-                        for a given gene, containing this kmer to keep it (default: 0)
   -o OUTPUT, --output OUTPUT
                         output directory (default: 'output')
   -p PROCS, --procs PROCS

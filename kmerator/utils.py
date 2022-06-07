@@ -86,14 +86,6 @@ def usage():
                             "least one isoform of your gene of interest."
                             ),
                         )
-    parser.add_argument('--threshold',
-                        type=float,
-                        help=(
-                            "FOR ANNOTATED GENE ONLY: minimum fraction of annotated transcripts, "
-                            "for a given gene, containing this kmer to keep it (default: 0)"
-                            ),
-                        default=1,
-                        )
     parser.add_argument('--max-on-transcriptome',
                         type=float,
                         help=argparse.SUPPRESS,

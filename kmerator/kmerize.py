@@ -51,7 +51,7 @@ class SpecificKmers:
             seq_file = f"{gene_name}.{transcript_name}.fa"
             ### Define all variants for a gene
             variants_dict = { k:v for k,v in self.transcriptome_dict.items() if k.startswith(gene_name) }
-            nb_variants = len(variants_dict)
+            nb_isoforms = len(variants_dict)
             tag_file = f"{gene_name}-{transcript_name}-{level}-specific_kmers.fa"
             contig_file = f"{gene_name}-{transcript_name}-{level}-specific_contigs.fa"
         ## When '--chimera' option is set
@@ -135,14 +135,17 @@ class SpecificKmers:
 
             ### Case of annotated genes
             if level == 'gene':
-                ## if the kmer is present/unique or does not exist (splicing?) on the genome
+                ### if the kmer is present/unique or does not exist (splicing?) on the genome
                 if genome_count <= 1:
-                    variants_containing_this_kmer = [k for k,v in variants_dict.items() if mer in v]
-                    if self.args.stringent and transcriptome_count == nb_variants == len(variants_containing_this_kmer):
+                    ### who are the variants of this kmer
+                    isoforms_containing_this_kmer = [k for k,v in variants_dict.items() if mer in v]
+                    if  (self.args.stringent
+                            and transcriptome_count == nb_isoforms == len(isoforms_containing_this_kmer)
+                        ):
                         # kmers case
                         i += 1
-                        tmp = len(variants_containing_this_kmer)
-                        fasta_kmer_list.append(f">{gene_name}-{transcript_name}.kmer{i} ({tmp}/{nb_variants})\n{mer}")
+                        tmp = len(isoforms_containing_this_kmer)
+                        fasta_kmer_list.append(f">{gene_name}-{transcript_name}.kmer{i} ({tmp}/{nb_isoforms})\n{mer}")
                         # contigs case
                         if i == 1:
                             contig_seq = mer
@@ -156,13 +159,13 @@ class SpecificKmers:
                             contig_seq = mer
                             position_kmer_prev = position_kmer
                     elif (not self.args.stringent
-                            and transcriptome_count == len(variants_containing_this_kmer)
-                            and transcriptome_count >= nb_variants * self.args.threshold
+                            and transcriptome_count == len(isoforms_containing_this_kmer)
+                            and transcriptome_count > 0
                          ):
                         ### kmers case
                         i += 1
-                        tmp = len(variants_containing_this_kmer)
-                        fasta_kmer_list.append(f">{gene_name}-{transcript_name}.kmer{i} ({tmp}/{nb_variants})\n{mer}")
+                        tmp = len(isoforms_containing_this_kmer)
+                        fasta_kmer_list.append(f">{gene_name}-{transcript_name}.kmer{i} ({tmp}/{nb_isoforms})\n{mer}")
                         ### contigs case
                         if i == 1:
                             contig_seq = mer

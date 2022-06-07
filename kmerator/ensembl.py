@@ -120,7 +120,9 @@ class Ensembl:
             split_symbol = response['display_name'].split('-') if 'display_name' in response else response['id']
             symbol_start = split_symbol[:-1]
             symbol_end = split_symbol[-1]
-            symbol = '-'.join(symbol_start) if symbol_end.isnumeric() and len(symbol_end) == 3 else '-'.join(symbol_start.append(symbol_end))
+            if not symbol_end.isnumeric() or len(symbol_end) != 3:
+                symbol_start.append(symbol_end)
+            symbol = '-'.join(symbol_start)
 
             transcripts[transcript] = {'symbol':symbol, 'level': level, 'given': item}
             if level == 'gene':
