@@ -77,7 +77,7 @@ class Ensembl:
         ### Define symbol urls for urls list
         for symbol in ensg_symbol_list:
             if len(symbol['response']) == 0:
-                self.report['aborted'].append(f"{symbol['item']!r} not found by Ensembl API.")
+                # ~ self.report['aborted'].append(f"{symbol['item']!r} not found by Ensembl API.")
                 continue
             for ensg in symbol['response']:
                 item = symbol['item']
@@ -95,9 +95,10 @@ class Ensembl:
             response = dic['response']
             level = dic['level']
             item = dic['item']
-            if  not 'display_name' in response:
+            print(response)
+            # ~ if  not 'display_name' in response:
                 # ~ self.report['aborted'].append(f"{item!r} not found by Ensembl API.")
-                continue
+                # ~ continue
             if response['seq_region_name'].startswith('CHR_'):
                 if not dic['item'] in find_xtime:  # to avoid repetition when multiples ENST are found for once gene
                     self.report['aborted'].append(f"{item!r} found in an alternative chromosome (Ensembl API).")
@@ -117,16 +118,20 @@ class Ensembl:
                 MIR3179-4-201    is not good
             remove last item if numeric (a real headache).
             """
-            split_symbol = response['display_name'].split('-') if 'display_name' in response else response['id']
-            symbol_start = split_symbol[:-1]
-            symbol_end = split_symbol[-1]
-            if not symbol_end.isnumeric() or len(symbol_end) != 3:
-                symbol_start.append(symbol_end)
-            symbol = '-'.join(symbol_start)
+            if 'display_name' in response:
+                split_symbol = response['display_name'].split('.')[0].split('-') if 'display_name' in response else response['id']
+                symbol_start = split_symbol[:-1]
+                symbol_end = split_symbol[-1]
+                if not symbol_end.isnumeric() or len(symbol_end) != 3:
+                    symbol_start.append(symbol_end)
+                symbol = '-'.join(symbol_start)
 
-            transcripts[transcript] = {'symbol':symbol, 'level': level, 'given': item}
-            if level == 'gene':
-                find_xtime[item].append(response['display_name'])
+                transcripts[transcript] = {'symbol':symbol, 'level': level, 'given': item}
+                if level == 'gene':
+                    find_xtime[item].append(response['display_name'])
+            else:
+                transcripts[transcript] = {'symbol': 'N/A', 'level': level, 'given': item}
+            print(transcripts)
 
         ### add multiple ENSTxxx found per gene
         for item, names in find_xtime.items():
@@ -151,7 +156,7 @@ class Ensembl:
         if 'error' in r:
             response['response'] = []
         ### Because Ensembl limits requests to 15 per second
-        limit = max(0, 1-(time.time()-start_time))
+        limit = max(0, 1-(time.time()-start_time)+0.05)
         time.sleep(limit)
         response['response'] = r
         return response

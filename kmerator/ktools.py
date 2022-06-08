@@ -234,7 +234,7 @@ class MkTranscripts:
             case 'kmc':
                 print(f"prefered tool: {os.path.basename(tool)}")
             case 'jellyfish':
-                cmd = f"{tool} count -m 31 -s 100000 {transcriptome_fa} -o {transcriptome_idx}"
+                cmd = f"{tool} count -m args.kmer_length -s 100000 {transcriptome_fa} -o {transcriptome_idx}"
         '''
         tool = tools[num]
         ## kmc case
@@ -242,7 +242,7 @@ class MkTranscripts:
         ## jellyfish case
         elif tool == 'jellyfish':
             transcriptome_idx = f"{os.path.splitext(transcriptome_fa)[0]}.jf"
-            cmd = f"{tool} count -t {args.thread} -m 31 -s 100000 {transcriptome_fa} -o {transcriptome_idx}"
+            cmd = f"{tool} count -t {args.thread} -m {args.kmer_length} -s 100000 {transcriptome_fa} -o {transcriptome_idx}"
 
         ### Build index
         print(f"Build index with {tool!r}, please wait...")
@@ -296,7 +296,12 @@ def usage():
                         help="number of trhead (defaul: 1)",
                         default=1,
                        )
-    parser_mk_tcrptome.add_argument('-k', '--keep',
+    parser_mk_tcrptome.add_argument('-k', '--kmer-length',
+                        type=int,
+                        help="length of kmer (defaul: 31)",
+                        default=31,
+                       )
+    parser_mk_tcrptome.add_argument('--keep',
                         action="store_true",          # boolean
                         help="Keep intermediates files",
                        )

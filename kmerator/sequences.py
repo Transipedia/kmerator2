@@ -33,7 +33,7 @@ class Sequences:
         if self.args.selection:
             ### Abort if no transcripts found
             if not self.transcripts:
-                sys.exit(f"{Color.RED}Error: no sequence found for {self.args.selection}")
+                sys.exit(f"{Color.RED}\n Error: no sequence found for {self.args.selection}{Color.END}")
             ### create output directory structure
             os.makedirs(output_seq_dir, exist_ok=True)
 

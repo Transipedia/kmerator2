@@ -253,9 +253,9 @@ class SpecificKmers:
                 fh.write("\n".join(fasta_kmer_list) + '\n')
         else:
             if self.args.selection:
-                mesg = (f"{given_name}: not specific kmers found.")
+                mesg = (f"{given_name}: no specific kmers found.")
             else:
-                mesg = (f"{transcript}: Not specific kmers found.")
+                mesg = (f"{transcript}: No specific kmers found.")
             return ('aborted', mesg)
         ## write contig files
         if fasta_contig_list:
