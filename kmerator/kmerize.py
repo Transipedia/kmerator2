@@ -38,7 +38,6 @@ class SpecificKmers:
         '''
         transcript is a dict when '--selection' is set, else it is a list
         '''
-        # ~ if self.args.debug: print(f"{Color.YELLOW}Start jellyfish count on {transcript}.{Color.END}")
         ### Define some variables: gene_name, transcript_name, variants_dic and output file names
         fasta_kmer_list = []                # specific kmers list
         fasta_contig_list = []              # specific contigs list
@@ -132,20 +131,19 @@ class SpecificKmers:
                 revcomp_mer = [self.rev[base] for base in mer]
                 genome_count = kmercounts_genome_dict[revcomp_mer]
             transcriptome_count = kmercounts_transcriptome_dict[mer]
-
             ### Case of annotated genes
             if level == 'gene':
                 ### if the kmer is present/unique or does not exist (splicing?) on the genome
                 if genome_count <= 1:
                     ### who are the variants of this kmer
                     isoforms_containing_this_kmer = [k for k,v in variants_dict.items() if mer in v]
+                    nb_iso = len(isoforms_containing_this_kmer)
                     if  (self.args.stringent
                             and transcriptome_count == nb_isoforms == len(isoforms_containing_this_kmer)
                         ):
                         # kmers case
                         i += 1
-                        tmp = len(isoforms_containing_this_kmer)
-                        fasta_kmer_list.append(f">{gene_name}-{transcript_name}.kmer{i} ({tmp}/{nb_isoforms})\n{mer}")
+                        fasta_kmer_list.append(f">{gene_name}:{transcript_name}.kmer{i} ({nb_iso}/{nb_isoforms})\n{mer}")
                         # contigs case
                         if i == 1:
                             contig_seq = mer
@@ -154,7 +152,7 @@ class SpecificKmers:
                             contig_seq = f"{contig_seq}{mer[-1]}"
                             position_kmer_prev = position_kmer
                         else:
-                            fasta_contig_list.append(f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}")
+                            fasta_contig_list.append(f">{gene_name}:{transcript_name}.contig{j}\n{contig_seq}")
                             j = j+1
                             contig_seq = mer
                             position_kmer_prev = position_kmer
@@ -163,9 +161,9 @@ class SpecificKmers:
                             and transcriptome_count > 0
                          ):
                         ### kmers case
+                        # ~ '''
                         i += 1
-                        tmp = len(isoforms_containing_this_kmer)
-                        fasta_kmer_list.append(f">{gene_name}-{transcript_name}.kmer{i} ({tmp}/{nb_isoforms})\n{mer}")
+                        fasta_kmer_list.append(f">{gene_name}:{transcript_name}.kmer{i} ({nb_iso}/{nb_isoforms})\n{mer}")
                         ### contigs case
                         if i == 1:
                             contig_seq = mer
@@ -174,10 +172,11 @@ class SpecificKmers:
                             contig_seq = f"{contig_seq}{mer[-1]}"
                             position_kmer_prev = position_kmer
                         else:
-                            fasta_contig_list.append(f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}")
+                            fasta_contig_list.append(f">{gene_name}:{transcript_name}.contig{j}\n{contig_seq}")
                             j += 1
                             contig_seq = mer
                             position_kmer_prev = position_kmer
+                        # ~ '''
 
             ### Cases of transcripts 1) unannotated, 2) annotated.
             elif level == 'transcript':
@@ -202,7 +201,7 @@ class SpecificKmers:
                 elif self.args.selection and transcriptome_count == 1 and genome_count <= 1:
                     ### kmers case
                     i += 1
-                    fasta_kmer_list.append(f">{gene_name}-{transcript_name}.kmer{i}\n{mer}")
+                    fasta_kmer_list.append(f">{transcript_name}.kmer{i}\n{mer}")
                     ### contigs case
                     if i == 1:
                         contig_seq = mer
@@ -211,7 +210,7 @@ class SpecificKmers:
                         contig_seq = f"{contig_seq}{mer[-1]}"
                         position_kmer_prev = position_kmer
                     else:
-                        fasta_contig_list.append(f">{gene_name}.contig{j}\n{contig_seq}")
+                        fasta_contig_list.append(f">{transcript_name}.contig{j}\n{contig_seq}")
                         j += 1
                         contig_seq = mer
                         position_kmer_prev = position_kmer
@@ -239,9 +238,9 @@ class SpecificKmers:
 
         ### append last contig in list
         if level == "gene" and contig_seq:
-            fasta_contig_list.append(f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}")
+            fasta_contig_list.append(f">{given_name}:{transcript_name}.contig{j}\n{contig_seq}")
         elif level == "transcript" and self.args.selection and contig_seq:
-            fasta_contig_list.append(f">{gene_name}-{transcript_name}.contig{j}\n{contig_seq}")
+            fasta_contig_list.append(f">{given_name}.contig{j}\n{contig_seq}")
         elif (level == "chimera" or (level == "transcript" and self.args.fasta_file)) and contig_seq:
             fasta_contig_list.append(f">{gene_name}.contig{j}\n{contig_seq}")
 
@@ -253,9 +252,9 @@ class SpecificKmers:
                 fh.write("\n".join(fasta_kmer_list) + '\n')
         else:
             if self.args.selection:
-                mesg = (f"{given_name}: no specific kmers found.")
+                mesg = (f"{given_name!r} has no specific kmers found.")
             else:
-                mesg = (f"{transcript}: No specific kmers found.")
+                mesg = (f"{transcript!r} has no specific kmers found.")
             return ('aborted', mesg)
         ## write contig files
         if fasta_contig_list:

@@ -6,6 +6,8 @@ import requests
 import collections
 from concurrent.futures import ThreadPoolExecutor
 import time
+from utils import Color
+import json
 
 
 def main():
@@ -37,8 +39,9 @@ class Ensembl:
     url = "https://rest.ensembl.org"
     nb_threads = 15                     # Because Ensembl limits requests to 15 per second'
 
-    def __init__(self, args, report):
+    def __init__(self, args, transcript2gene_dict, report):
         """ Class initialiser """
+        self.transcript2gene_dict = transcript2gene_dict
         self.report = report
         self.args = args
         self.headers = {"Content-Type" : "application/json"}   # header for the query
@@ -88,14 +91,14 @@ class Ensembl:
 
         ### fetch Ensembl ENSTxxx matching with given GENES, ENSGxxx and ENSTxxx
         find_xtime = collections.defaultdict(list)
-
         with ThreadPoolExecutor(Ensembl.nb_threads) as pool:
             enst_list = list(pool.map(self.ebl_request, urls))
         for dic in enst_list:
             response = dic['response']
+            if not response:
+                continue
             level = dic['level']
             item = dic['item']
-            print(response)
             # ~ if  not 'display_name' in response:
                 # ~ self.report['aborted'].append(f"{item!r} not found by Ensembl API.")
                 # ~ continue
@@ -107,31 +110,14 @@ class Ensembl:
                 transcript = response['id'].upper()
             else:
                 transcript = response['canonical_transcript'].split('.')[0]
-            # ~ symbol = response['display_name'].split('-')[0] if 'display_name' in response else response['id']
-            """
-            Very annoying:
-                TSNAX            is good
-                TSNAX-DISC1      is good (not the same than TSNAX)
-                TSNAX-DISC1-208  is not good: 208 is a version number
-            remove items if they are numeric ? Not exactly because
-                MIR3179-4        is good
-                MIR3179-4-201    is not good
-            remove last item if numeric (a real headache).
-            """
-            if 'display_name' in response:
-                split_symbol = response['display_name'].split('.')[0].split('-') if 'display_name' in response else response['id']
-                symbol_start = split_symbol[:-1]
-                symbol_end = split_symbol[-1]
-                if not symbol_end.isnumeric() or len(symbol_end) != 3:
-                    symbol_start.append(symbol_end)
-                symbol = '-'.join(symbol_start)
-
-                transcripts[transcript] = {'symbol':symbol, 'level': level, 'given': item}
+            ### create transcript dict
+            if transcript in self.transcript2gene_dict:
+                symbol = self.transcript2gene_dict[transcript]
+                transcripts[transcript] = {'given': item, 'symbol': symbol, 'level': level}
                 if level == 'gene':
-                    find_xtime[item].append(response['display_name'])
+                    find_xtime[item].append(symbol)
             else:
-                transcripts[transcript] = {'symbol': 'N/A', 'level': level, 'given': item}
-            print(transcripts)
+                transcripts[transcript] = {'given': item, 'level': level}
 
         ### add multiple ENSTxxx found per gene
         for item, names in find_xtime.items():
@@ -143,22 +129,30 @@ class Ensembl:
 
     def ebl_request(self, query):
         start_time = time.time()                # Because Ensembl limits requests to 15 per second
+        ### part of query is returned in response
+        response = query
         try:
             r = requests.get(query['url'], headers=self.headers)
         except requests.ConnectionError as err:
-            sys.exit(f"\n Error: Ensembl is not accessible or not responding.")
-        r = r.json()
-        ### part of query is returned in response
-        response = query
+            sys.exit(f"{Color.RED}\n Error: Ensembl is not accessible or not responding.{Color.END}")
+        ### remove useless info
         response.pop('url')
+        if not r.ok:
+            # ~ self.report['aborted'].append(f"{query['item']!r}: something went wrong whis the request to Ensembl.")
+            r = []
+        else:
+            r = r.json()
         if not r:
-            response['response'] = []
-        if 'error' in r:
-            response['response'] = []
+            self.report['aborted'].append(f"{query['item']!r} not found by the Ensembl API.")
+            r = []
+        elif 'error' in r:
+            self.report['aborted'].append(f"{query['item']!r} not found by Ensembl API.")
+            r = []
         ### Because Ensembl limits requests to 15 per second
         limit = max(0, 1-(time.time()-start_time)+0.05)
         time.sleep(limit)
         response['response'] = r
+
         return response
 
 

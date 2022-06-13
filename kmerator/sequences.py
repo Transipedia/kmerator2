@@ -64,13 +64,11 @@ class Sequences:
         find canonical transcript in transcriptome and write his sequence in file.
         """
         desc = f"{transcript['symbol']}:{transcript['enst']}"
-        # ~ print("desc:", desc)
 
         if desc in self.transcriptome_dict:
-
             seq = self.transcriptome_dict[desc]
             if len(seq) < self.args.kmer_length:
-                self.report['warming'].append(f"{desc!r} sequence length < {self.args.kmer_length} => ignored")
+                self.report['warning'].append(f"{desc} has a sequence length < {self.args.kmer_length} => ignored")
                 return
             ### create fasta files
             outfile = f"{transcript['symbol'].replace('.','_')}.{transcript['enst']}.fa"[:255].replace(' ', '_').replace('/', '@SLASH@')
@@ -91,7 +89,7 @@ class Sequences:
         outfile = f"{entry['desc'].replace(' ', '_').replace('/', '@SLASH@')}.fa"[:255]
         outfile = os.path.join(self.args.output, 'sequences', outfile)
         if len(entry['seq']) < self.args.kmer_length:
-            self.report['aborted'].append(f"{entry['desc']!r} sequence length < {self.args.kmer_length} => ignored")
+            self.report['aborted'].append(f"{entry['desc']} sequence length < {self.args.kmer_length} => ignored.")
             return
         self.transcripts.append(entry['desc'])
         with open(outfile, 'w') as fh:

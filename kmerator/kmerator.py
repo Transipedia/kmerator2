@@ -46,18 +46,15 @@ def main():
     if args.selection:
         ### Load transcriptome as dict (needed to build sequences and to found specific kmers
         print(f" 🧬 Load transcriptome.")
-        transcriptome_dict = ebl_fasta2dict(args.transcriptome)
+        transcriptome_dict, transcript2gene_dict = ebl_fasta2dict(args.transcriptome)
         ### get canonical transcripts using Ensembl API
         print(f" 🧬 Fetch some information from Ensembl API.")
-        ensembl = Ensembl(args, report)
+        ensembl = Ensembl(args, transcript2gene_dict, report)
         best_transcripts = ensembl.get_ENST()
         ### Build sequence using provided transcriptome
         print(f" 🧬 Build sequences.")
-        # ~ build_sequences(args, report, best_transcripts, transcriptome_dict)
-        # ~ sequences.build(args, report, best_transcripts, transcriptome_dict)
         seq = Sequences(args, report, best_transcripts, transcriptome_dict)
         seq.build()
-
     ### when --fasta-file option is set
     else:
         print(f" 🧬 Build sequences.")
@@ -109,18 +106,20 @@ def ebl_fasta2dict(fasta_file):
             sys.exit(f"{Color.RED}Error: {os.path.basename(args.fasta_file.name)!r} does not seem to be in fasta format.")
     ### compute file as dict
     fasta_dict = {}
+    transcript2gene_dict = {}
     with open(fasta_file) as fh:
         seq = ""
         old_desc, new_desc = "", ""
         for line in fh:
             if line[0] == ">":
                 line = line.split()
-                if len(line) > 6:
-                    gene_name = line[6].split(':')[1] #.split('-')[0]                    # gene symbol
+                if len(line) > 6 and line[6].split(':')[0] == 'gene_symbol':
+                    gene_name = line[6].split(':')[1]                    # gene symbol
                 else:
                     gene_name = line[3].split(':')[1].split('.')[0]      # ENSG
                 transcript_name = line[0].split('.')[0].lstrip('>')
                 new_desc = f"{gene_name}:{transcript_name}"
+                transcript2gene_dict[transcript_name] = gene_name
                 # ~ new_desc = transcript_name
                 if old_desc:
                     fasta_dict[old_desc] = seq
@@ -129,7 +128,7 @@ def ebl_fasta2dict(fasta_file):
             else:
                 seq += line.rstrip()
     fasta_dict[old_desc] = seq
-    return fasta_dict
+    return fasta_dict, transcript2gene_dict
 
 
 def merged_results(args):
