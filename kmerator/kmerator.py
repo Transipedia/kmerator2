@@ -2,6 +2,10 @@
 
 """
 Decomposition of transcript or gene sequences and extraction of their specific k-mers
+1. Load transcriptome
+2. Request Ensembl - build best transcripts
+3. Build sequences for each transcript
+4. Get specific kmers
 """
 
 
@@ -37,7 +41,7 @@ def main():
     checkup_args(args)
 
     ### some variables
-    report = {'aborted': [], 'done': [], 'multiple': []}
+    report = {'aborted': [], 'done': [], 'multiple': [], 'warning': []}
     transcriptome_dict = {}
     best_transcripts = {}                       # when genes/transcripts annotated (--selection)
     unannotated_transcripts = []                # when transcripts are unannotated (--fasta-file)
@@ -171,6 +175,16 @@ def show_info(report):
                 break
             print(f"  - {mesg}")
 
+    if report['warning']:
+        print(f"{Color.RED}\n Warning ({len(report['warning'])}):")
+        for i,mesg in enumerate(report['warning']):
+            if i == 15:
+                print("  - ... (more responses)")
+                break
+            print(f"  - {mesg}")
+
+
+
     print(f"{Color.END}")
 
 
@@ -196,6 +210,10 @@ def markdown_report(args, report):
         if report['aborted']:
             fh.write(f"\n\n**Genes/transcript missing ({len(report['aborted'])})**\n\n")
             for mesg in report['aborted']:
+                fh.write(f"- {mesg}\n")
+        if report['warning']:
+            fh.write(f"\n\n**Warnings ({len(report['warning'])})**\n\n")
+            for mesg in report['warning']:
                 fh.write(f"- {mesg}\n")
 
 

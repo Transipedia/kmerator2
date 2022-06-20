@@ -63,6 +63,8 @@ class Sequences:
         """
         find canonical transcript in transcriptome and write his sequence in file.
         """
+        # ~ if not 'symbol' in transcript:
+            # ~ print(f"{Color.RED}No symbol name found ({transcript}.{Color.END}")
         desc = f"{transcript['symbol']}:{transcript['enst']}"
 
         if desc in self.transcriptome_dict:

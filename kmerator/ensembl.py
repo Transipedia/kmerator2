@@ -117,7 +117,8 @@ class Ensembl:
                 if level == 'gene':
                     find_xtime[item].append(symbol)
             else:
-                transcripts[transcript] = {'given': item, 'level': level}
+                self.report['aborted'].append(f"{transcript!r} not found in transcriptome ({item}).")
+                # ~ transcripts[transcript] = {'given': item, 'level': level}
 
         ### add multiple ENSTxxx found per gene
         for item, names in find_xtime.items():

@@ -128,7 +128,7 @@ class SpecificKmers:
             if mer in kmercounts_genome_dict.keys():
                 genome_count = kmercounts_genome_dict[mer]
             else:
-                revcomp_mer = [self.rev[base] for base in mer]
+                revcomp_mer = ''.join([self.rev[base] for base in mer][::-1])
                 genome_count = kmercounts_genome_dict[revcomp_mer]
             transcriptome_count = kmercounts_transcriptome_dict[mer]
             ### Case of annotated genes
