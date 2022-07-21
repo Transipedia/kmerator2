@@ -70,10 +70,11 @@ class Sequences:
         if desc in self.transcriptome_dict:
             seq = self.transcriptome_dict[desc]
             if len(seq) < self.args.kmer_length:
-                self.report['warning'].append(f"{desc} has a sequence length < {self.args.kmer_length} => ignored")
+                self.report['aborted'].append(f"{transcript['given']!r} has a sequence length < {self.args.kmer_length} => ignored")
+                self.removed_transcripts.append(transcript['enst'])
                 return
             ### create fasta files
-            outfile = f"{transcript['symbol'].replace('.','_')}.{transcript['enst']}.fa"[:255].replace(' ', '_').replace('/', '@SLASH@')
+            outfile = f"{transcript['symbol']}.{transcript['enst']}.fa" # [:255].replace(' ', '_').replace('/', '@SLASH@')
             outfile = f"{self.args.output}/sequences/{outfile}"
             with open(outfile, 'w') as fh:
                 fh.write(f">{transcript['symbol']}:{transcript['enst']}\n{seq}")
@@ -92,6 +93,7 @@ class Sequences:
         outfile = os.path.join(self.args.output, 'sequences', outfile)
         if len(entry['seq']) < self.args.kmer_length:
             self.report['aborted'].append(f"{entry['desc']} sequence length < {self.args.kmer_length} => ignored.")
+            self.removed_transcripts.append(transcript['enst'])
             return
         self.transcripts.append(entry['desc'])
         with open(outfile, 'w') as fh:

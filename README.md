@@ -10,6 +10,14 @@ Kmerator strictly depends on a reference genome (fasta or jellyfish index format
 Kmerator2 is new version of kmerator, written in python3 (julia with first version), several options have changed. It is compatible with last versions of Ensembl transcriptome (version 103 max for kmerator). The output is improved and a file report is produced. 
 
 
+#### Specific kmers
+
+![](img/specific-kmers.png)
+
+#### Specific config
+
+![](img/specific-contigs.png)
+
 ## Dependencies
 
 - Python >= v3.6

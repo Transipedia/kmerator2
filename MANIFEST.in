@@ -1,7 +1,5 @@
-# include *.md *.yaml
-
-# include all files in lib directory
-kmerator
+# include all files in img directory
+graft img
 
 # exclude all files in directory
 prune kmerator-results
